@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>💀 Happy Harvest - HACKER MODE</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #2d1b0e;
+      --bg-light: #3d2b1e;
+      --green: #4caf50;
+      --green-dark: #388e3c;
+      --gold: #ffd700;
+      --brown: #8b4513;
+      --brown-light: #a0522d;
+      --sky: #87ceeb;
+      --grass: #7ec850;
+      --grass-dark: #5da035;
+      --dirt: #c4a265;
+      --dirt-dark: #a08040;
+      --water: #4fc3f7;
+      --red: #e74c3c;
+      --white: #f5f5f5;
+      --text: #f0e6d3;
+      --text-dark: #8b7355;
+      --panel: rgba(45, 27, 14, 0.95);
+      --panel-border: #5d4037;
+      --btn: #5d4037;
+      --btn-hover: #795548;
+      --btn-active: #4e342e;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      user-select: none;
+    }
+
+    /* --- Login Screen --- */
+    #login-screen {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #87ceeb 0%, #7ec850 60%, #5da035 100%);
+      z-index: 1000;
+    }
+    #login-screen.hidden { display: none; }
+
+    .login-box {
+      background: var(--panel);
+      border: 3px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      min-width: 360px;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .login-box h1 { font-size: 2em; margin-bottom: 4px; }
+    .login-box .subtitle { color: var(--text-dark); margin-bottom: 24px; font-size: 14px; }
+
+    .tab-buttons {
+      display: flex; margin-bottom: 20px;
+      border-radius: 8px; overflow: hidden;
+      border: 2px solid var(--panel-border);
+    }
+    .tab-btn {
+      flex: 1; padding: 10px;
+      background: var(--bg-light);
+      color: var(--text-dark);
+      border: none; cursor: pointer;
+      font-size: 14px; font-weight: bold;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--green);
+      color: white;
+    }
+    .tab-btn:hover:not(.active) { background: var(--btn); }
+
+    .form-group { margin-bottom: 14px; text-align: left; }
+    .form-group label {
+      display: block; margin-bottom: 4px;
+      font-size: 12px; color: var(--text-dark);
+    }
+    .form-group input {
+      width: 100%; padding: 10px 14px;
+      border: 2px solid var(--panel-border);
+      border-radius: 8px;
+      background: var(--bg-light);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+    }
+    .form-group input:focus { border-color: var(--green); }
+
+    .login-form.hidden { display: none; }
+
+    .login-btn {
+      width: 100%; padding: 12px;
+      background: var(--green);
+      color: white; font-size: 16px; font-weight: bold;
+      border: none; border-radius: 8px;
+      cursor: pointer; transition: background 0.2s;
+      margin-top: 8px;
+    }
+    .login-btn:hover { background: var(--green-dark); }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .login-error { color: var(--red); margin-top: 8px; font-size: 13px; min-height: 18px; }
+    .login-footer {
+      margin-top: 16px; font-size: 11px; color: var(--text-dark);
+    }
+    .login-footer a { color: var(--sky); text-decoration: none; }
+    .login-footer a:hover { text-decoration: underline; }
+
+    /* --- Game UI --- */
+    #game-screen { display: none; height: 100vh; flex-direction: column; }
+    #game-screen.active { display: flex; }
+
+    /* Top bar */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 2px solid var(--panel-border);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .top-bar .stats {
+      display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    }
+    .stat { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+    .stat .icon { font-size: 20px; }
+    .stat .label { color: var(--text-dark); font-size: 12px; }
+    .stat .value { font-weight: bold; color: var(--gold); }
+
+    .sync-indicator {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--green);
+      transition: background 0.3s;
+    }
+    .sync-indicator.syncing { background: var(--gold); animation: pulse 0.5s infinite; }
+    .sync-indicator.error { background: var(--red); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .player-badge {
+      font-size: 13px; color: var(--text-dark);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .player-badge .name { color: var(--text); font-weight: bold; }
+
+    /* Main area */
+    .main-area {
+      flex: 1; display: flex; overflow: hidden;
+    }
+
+    /* Farm grid */
+    .farm-container {
+      flex: 1; display: flex;
+      align-items: center; justify-content: center;
+      background: linear-gradient(180deg, var(--sky) 0%, var(--grass) 40%, var(--grass-dark) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .farm-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      padding: 16px;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    .farm-slot {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      font-size: clamp(18px, 3vw, 32px);
+      border: 2px solid transparent;
+      min-height: 60px;
+    }
+    .farm-slot:hover { transform: scale(1.08); z-index: 2; }
+    .farm-slot.selected { border-color: var(--gold); box-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
+
+    .farm-slot.empty {
+      background: var(--grass);
+      border-color: rgba(0,0,0,0.1);
+    }
+    .farm-slot.tilled {
+      background: var(--dirt);
+      border-color: var(--dirt-dark);
+    }
+    .farm-slot.planted {
+      background: var(--dirt);
+      border-color: var(--dirt-dark);
+    }
+    .farm-slot.ready {
+      background: var(--dirt);
+      border-color: var(--gold);
+      animation: readyPulse 2s infinite;
+    }
+    @keyframes readyPulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(255,215,0,0.3); }
+      50% { box-shadow: 0 0 16px rgba(255,215,0,0.6); }
+    }
+
+    .slot-crop { line-height: 1; }
+    .slot-progress {
+      position: absolute; bottom: 2px; left: 4px; right: 4px;
+      height: 4px; background: rgba(0,0,0,0.3);
+      border-radius: 2px; overflow: hidden;
+    }
+    .slot-progress-fill {
+      height: 100%; background: var(--green);
+      border-radius: 2px; transition: width 0.5s;
+    }
+    .slot-water-indicator {
+      position: absolute; top: 2px; right: 4px;
+      font-size: 10px; opacity: 0.7;
+    }
+
+    /* Side panel */
+    .side-panel {
+      width: 280px;
+      background: var(--panel);
+      border-left: 2px solid var(--panel-border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .panel-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--panel-border);
+    }
+    .panel-tab {
+      flex: 1; padding: 10px;
+      text-align: center; cursor: pointer;
+      font-size: 13px; font-weight: bold;
+      background: var(--bg-light);
+      border: none; color: var(--text-dark);
+      transition: background 0.2s, color 0.2s;
+    }
+    .panel-tab.active {
+      background: var(--panel);
+      color: var(--text);
+      border-bottom: 2px solid var(--green);
+    }
+
+    .panel-content {
+      flex: 1; overflow-y: auto; padding: 12px;
+    }
+    .panel-content.hidden { display: none; }
+
+    /* Inventory items */
+    .inv-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px; margin-bottom: 6px;
+      background: var(--bg-light);
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .inv-item:hover { border-color: var(--panel-border); }
+    .inv-item.selected { border-color: var(--gold); }
+    .inv-item .item-icon { font-size: 24px; }
+    .inv-item .item-info { flex: 1; }
+    .inv-item .item-name { font-size: 13px; font-weight: bold; }
+    .inv-item .item-qty { font-size: 11px; color: var(--text-dark); }
+    .inv-item .item-actions { display: flex; gap: 4px; }
+    .inv-item .item-btn {
+      padding: 4px 8px; font-size: 11px;
+      background: var(--btn); color: var(--text);
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    .inv-item .item-btn:hover { background: var(--btn-hover); }
+    .inv-item .item-btn.sell { background: #c0392b; }
+    .inv-item .item-btn.sell:hover { background: #e74c3c; }
+
+    /* Shop items */
+    .shop-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px; margin-bottom: 6px;
+      background: var(--bg-light);
+      border-radius: 6px;
+    }
+    .shop-item .item-icon { font-size: 28px; }
+    .shop-item .item-info { flex: 1; }
+    .shop-item .item-name { font-size: 14px; font-weight: bold; }
+    .shop-item .item-price { font-size: 12px; color: var(--gold); }
+    .shop-item .buy-btn {
+      padding: 6px 12px; font-size: 12px; font-weight: bold;
+      background: var(--green); color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    .shop-item .buy-btn:hover { background: var(--green-dark); }
+    .shop-item .buy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Action bar */
+    .action-bar {
+      display: flex; gap: 8px; padding: 12px;
+      background: var(--panel);
+      border-top: 2px solid var(--panel-border);
+      justify-content: center;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .action-btn {
+      padding: 8px 16px;
+      background: var(--btn);
+      color: var(--text);
+      border: 2px solid var(--panel-border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover { background: var(--btn-hover); }
+    .action-btn:active { background: var(--btn-active); }
+    .action-btn.active { background: var(--green); border-color: var(--green); }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Notifications */
+    .notifications {
+      position: fixed; top: 60px; right: 16px;
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 100; pointer-events: none;
+    }
+    .notification {
+      padding: 10px 16px;
+      background: var(--panel);
+      border: 2px solid var(--panel-border);
+      border-radius: 8px;
+      font-size: 13px;
+      animation: slideIn 0.3s ease;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .notification.success { border-color: var(--green); }
+    .notification.error { border-color: var(--red); }
+    .notification.info { border-color: var(--sky); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* Energy bar */
+    .energy-bar-container {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .energy-bar {
+      width: 100px; height: 12px;
+      background: var(--bg-light);
+      border-radius: 6px; overflow: hidden;
+      border: 1px solid var(--panel-border);
+    }
+    .energy-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), #81c784);
+      transition: width 0.3s;
+    }
+
+    /* Floating particles */
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      animation: floatUp 3s ease forwards;
+      font-size: 16px;
+      z-index: 50;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-60px) scale(0.5); }
+    }
+
+    /* --- Hacker Panel --- */
+    .hacker-panel {
+      position: fixed; top: 0; right: 0;
+      width: 340px; height: 100vh;
+      background: rgba(10, 10, 10, 0.97);
+      border-left: 2px solid #ff0040;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 500;
+      display: flex; flex-direction: column;
+      font-family: 'Courier New', monospace;
+      color: #00ff41;
+      overflow-y: auto;
+    }
+    .hacker-panel.open { transform: translateX(0); }
+    .hacker-panel-header {
+      padding: 12px 16px;
+      background: #1a0000;
+      border-bottom: 1px solid #ff0040;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hacker-panel-header h3 { font-size: 14px; color: #ff0040; }
+    .hacker-panel-close {
+      background: none; border: none; color: #ff0040;
+      font-size: 18px; cursor: pointer;
+    }
+    .hacker-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid #222;
+    }
+    .hacker-section h4 {
+      font-size: 11px; color: #ff0040;
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .hack-btn {
+      display: block; width: 100%;
+      padding: 6px 10px; margin-bottom: 4px;
+      background: #1a0000; color: #00ff41;
+      border: 1px solid #333; border-radius: 3px;
+      cursor: pointer; font-family: inherit; font-size: 11px;
+      text-align: left; transition: all 0.15s;
+    }
+    .hack-btn:hover { background: #330000; border-color: #ff0040; color: #ff0040; }
+    .hack-log {
+      flex: 1; overflow-y: auto; padding: 8px 16px;
+      font-size: 10px; color: #555; line-height: 1.6;
+    }
+    .hack-log .hl-ok { color: #00ff41; }
+    .hack-log .hl-err { color: #ff0040; }
+    .hack-log .hl-warn { color: #ffd700; }
+    .hack-log .hl-info { color: #00ffff; }
+    .hack-indicator {
+      position: fixed; bottom: 10px; right: 10px;
+      font-size: 11px; color: #ff0040;
+      background: rgba(10,0,0,0.8);
+      padding: 4px 8px; border-radius: 4px;
+      border: 1px solid #ff004044;
+      z-index: 499;
+      opacity: 0.7;
+      cursor: pointer;
+    }
+    .hacker-badge {
+      position: fixed; top: 8px; right: 10px;
+      background: #ff0040; color: white;
+      font-size: 10px; padding: 2px 8px;
+      border-radius: 10px; z-index: 499;
+      font-family: 'Courier New', monospace;
+      animation: blink 2s infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .side-panel { width: 220px; }
+      .top-bar { padding: 6px 8px; }
+      .stat { font-size: 13px; }
+    }
+    @media (max-width: 600px) {
+      .main-area { flex-direction: column; }
+      .side-panel { width: 100%; height: 200px; border-left: none; border-top: 2px solid var(--panel-border); }
+      .farm-grid { padding: 8px; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen">
+    <div class="login-box">
+      <h1>🌾 Happy Harvest</h1>
+      <p class="subtitle">Grow your farm, harvest crops, and become the best farmer!</p>
+
+      <div class="tab-buttons">
+        <button class="tab-btn active" onclick="switchAuthTab('login')">Login</button>
+        <button class="tab-btn" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <div class="login-form" id="login-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="login-username" placeholder="Your farmer name" maxlength="20" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password">
+        </div>
+        <button class="login-btn" id="login-btn" onclick="doLogin()">🚜 Login & Farm!</button>
+        <div class="login-error" id="login-error"></div>
+      </div>
+
+      <!-- Register Form -->
+      <div class="login-form hidden" id="register-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reg-username" placeholder="Choose a farmer name" maxlength="20" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Choose a password" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="reg-password2" placeholder="Confirm password" autocomplete="new-password">
+        </div>
+        <button class="login-btn" id="reg-btn" onclick="doRegister()">🌱 Create Farm!</button>
+        <div class="login-error" id="reg-error"></div>
+      </div>
+
+      <div class="login-footer">
+        <a href="/">← Normal Mode</a> &nbsp;|&nbsp; 💀 You are in Hacker Mode — press H in-game for hack panel
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="stats">
+        <div class="stat">
+          <span class="icon">🪙</span>
+          <span class="value" id="coins-display">100</span>
+        </div>
+        <div class="stat">
+          <span class="icon">⭐</span>
+          <span class="label">Lv</span>
+          <span class="value" id="level-display">1</span>
+        </div>
+        <div class="stat">
+          <span class="icon">✨</span>
+          <span class="value" id="xp-display">0</span>
+        </div>
+        <div class="stat energy-bar-container">
+          <span class="icon">⚡</span>
+          <div class="energy-bar">
+            <div class="energy-bar-fill" id="energy-bar" style="width:100%"></div>
+          </div>
+          <span class="value" id="energy-display">100/100</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div class="player-badge">
+          <span>🧑‍🌾</span>
+          <span class="name" id="player-name-display">Farmer</span>
+        </div>
+        <span style="font-size:12px;color:var(--text-dark);" id="sync-status">Ready</span>
+        <div class="sync-indicator" id="sync-indicator"></div>
+      </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+      <!-- Farm Grid -->
+      <div class="farm-container">
+        <div class="farm-grid" id="farm-grid"></div>
+      </div>
+
+      <!-- Side Panel -->
+      <div class="side-panel">
+        <div class="panel-tabs">
+          <button class="panel-tab active" onclick="switchTab('inventory')">🎒 Inventory</button>
+          <button class="panel-tab" onclick="switchTab('shop')">🏪 Shop</button>
+        </div>
+        <div class="panel-content" id="inventory-panel"></div>
+        <div class="panel-content hidden" id="shop-panel"></div>
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <button class="action-btn active" data-tool="select" onclick="selectTool('select')">👆 Select</button>
+      <button class="action-btn" data-tool="hoe" onclick="selectTool('hoe')">🪓 Till</button>
+      <button class="action-btn" data-tool="plant" onclick="selectTool('plant')">🌱 Plant</button>
+      <button class="action-btn" data-tool="water" onclick="selectTool('water')">💧 Water</button>
+      <button class="action-btn" data-tool="harvest" onclick="selectTool('harvest')">🫳 Harvest</button>
+      <button class="action-btn" data-tool="fertilize" onclick="selectTool('fertilize')">🧪 Fertilize</button>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="notifications" id="notifications"></div>
+
+  <!-- Hacker Badge -->
+  <div class="hacker-badge" id="hacker-badge" style="display:none;">💀 HACKER MODE</div>
+  <div class="hack-indicator" onclick="toggleHackerPanel()">Press H for Hacker Panel</div>
+
+  <!-- Hacker Panel -->
+  <div class="hacker-panel" id="hacker-panel">
+    <div class="hacker-panel-header">
+      <h3>💀 HACK PANEL</h3>
+      <button class="hacker-panel-close" onclick="toggleHackerPanel()">✕</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>💰 Money Hacks</h4>
+      <button class="hack-btn" onclick="hackGiveCoins(1000)">+1,000 Coins (local)</button>
+      <button class="hack-btn" onclick="hackGiveCoins(100000)">+100,000 Coins (local)</button>
+      <button class="hack-btn" onclick="hackGiveCoins(999999999)">+999,999,999 Coins (local)</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>⚡ Energy Hacks</h4>
+      <button class="hack-btn" onclick="hackRefillEnergy()">Refill Energy to Max</button>
+      <button class="hack-btn" onclick="hackSetMaxEnergy(99999)">Set Max Energy to 99,999</button>
+      <button class="hack-btn" onclick="hackInfiniteEnergy()">Toggle Infinite Energy</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>🌱 Farm Hacks</h4>
+      <button class="hack-btn" onclick="hackGrowAll()">Instant Grow All Crops</button>
+      <button class="hack-btn" onclick="hackHarvestAll()">Harvest All Ready Crops</button>
+      <button class="hack-btn" onclick="hackTillAll()">Till All Empty Slots</button>
+      <button class="hack-btn" onclick="hackPlantAll('wheat')">Plant Wheat Everywhere</button>
+      <button class="hack-btn" onclick="hackPlantAll('strawberry')">Plant Strawberry Everywhere</button>
+      <button class="hack-btn" onclick="hackWaterAll()">Water All Planted Crops</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>🎒 Inventory Hacks</h4>
+      <button class="hack-btn" onclick="hackGiveAllTools()">Give All Tools (1 each)</button>
+      <button class="hack-btn" onclick="hackGiveSeeds(100)">Give 100 of Each Seed</button>
+      <button class="hack-btn" onclick="hackGiveFertilizer(50)">Give 50 Fertilizer</button>
+      <button class="hack-btn" onclick="hackGiveItem('gold_egg', 10)">Give 10 Gold Eggs</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>⭐ Level Hacks</h4>
+      <button class="hack-btn" onclick="hackSetLevel(10)">Set Level to 10</button>
+      <button class="hack-btn" onclick="hackGiveXP(10000)">+10,000 XP</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>🐛 Exploit Attempts (test server)</h4>
+      <button class="hack-btn" onclick="hackForgeWAL_NegativeCoins()">Forge WAL: Sell items you don't have</button>
+      <button class="hack-btn" onclick="hackForgeWAL_FutureTimestamp()">Forge WAL: Future timestamp</button>
+      <button class="hack-btn" onclick="hackForgeWAL_PastTimestamp()">Forge WAL: Very old timestamp</button>
+      <button class="hack-btn" onclick="hackForgeWAL_OutOfOrder()">Forge WAL: Out-of-order timestamps</button>
+      <button class="hack-btn" onclick="hackForgeWAL_NegativeQuantity()">Forge WAL: Negative sell quantity</button>
+      <button class="hack-btn" onclick="hackForgeWAL_InvalidSlot()">Forge WAL: Invalid slot index</button>
+      <button class="hack-btn" onclick="hackForgeWAL_Massive()">Forge WAL: 1000 actions flood</button>
+      <button class="hack-btn" onclick="hackForgeWAL_UnknownAction()">Forge WAL: Unknown action type</button>
+    </div>
+
+    <div class="hacker-section">
+      <h4>📊 Attack Results</h4>
+      <button class="hack-btn" onclick="hackClearLog()">Clear Log</button>
+      <button class="hack-btn" onclick="hackRunAll()">🚀 Run All Exploit Tests</button>
+    </div>
+
+    <div class="hack-log" id="hack-log"></div>
+  </div>
+
+  <script>
+    // ============================================================
+    // SHARED GAME DATA (matches shared/gameData.ts)
+    // ============================================================
+
+    const CROPS = {
+      wheat:      { id: 'wheat',      name: 'Wheat',      seedPrice: 5,  sellPrice: 12, growTimeMs: 30000,  stages: 4, waterBonus: 1.5, season: 'all' },
+      carrot:     { id: 'carrot',     name: 'Carrot',     seedPrice: 8,  sellPrice: 18, growTimeMs: 45000,  stages: 4, waterBonus: 1.3, season: 'spring' },
+      tomato:     { id: 'tomato',     name: 'Tomato',     seedPrice: 12, sellPrice: 28, growTimeMs: 60000,  stages: 5, waterBonus: 1.4, season: 'summer' },
+      corn:       { id: 'corn',       name: 'Corn',       seedPrice: 15, sellPrice: 35, growTimeMs: 90000,  stages: 5, waterBonus: 1.2, season: 'summer' },
+      pumpkin:    { id: 'pumpkin',    name: 'Pumpkin',    seedPrice: 20, sellPrice: 50, growTimeMs: 120000, stages: 5, waterBonus: 1.3, season: 'fall' },
+      strawberry: { id: 'strawberry', name: 'Strawberry', seedPrice: 25, sellPrice: 60, growTimeMs: 150000, stages: 6, waterBonus: 1.6, season: 'spring' },
+    };
+
+    const ITEMS = {
+      wheat:       { id: 'wheat',       name: 'Wheat',       buyPrice: null,  sellPrice: 12,  stackable: true, maxStack: 999 },
+      carrot:      { id: 'carrot',      name: 'Carrot',      buyPrice: null,  sellPrice: 18,  stackable: true, maxStack: 999 },
+      tomato:      { id: 'tomato',      name: 'Tomato',      buyPrice: null,  sellPrice: 28,  stackable: true, maxStack: 999 },
+      corn:        { id: 'corn',        name: 'Corn',        buyPrice: null,  sellPrice: 35,  stackable: true, maxStack: 999 },
+      pumpkin:     { id: 'pumpkin',     name: 'Pumpkin',     buyPrice: null,  sellPrice: 50,  stackable: true, maxStack: 999 },
+      strawberry:  { id: 'strawberry',  name: 'Strawberry',  buyPrice: null,  sellPrice: 60,  stackable: true, maxStack: 999 },
+      hoe:         { id: 'hoe',         name: 'Hoe',         buyPrice: 50,    sellPrice: 25,  stackable: false, maxStack: 1 },
+      watering_can:{ id: 'watering_can',name: 'Watering Can',buyPrice: 75,    sellPrice: 35,  stackable: false, maxStack: 1 },
+      scythe:      { id: 'scythe',      name: 'Scythe',      buyPrice: 100,   sellPrice: 50,  stackable: false, maxStack: 1 },
+      fertilizer:  { id: 'fertilizer',  name: 'Fertilizer',  buyPrice: 30,    sellPrice: 10,  stackable: true, maxStack: 50 },
+      gold_egg:    { id: 'gold_egg',    name: 'Gold Egg',    buyPrice: null,  sellPrice: 200, stackable: true, maxStack: 10 },
+    };
+
+    const SHOP_ITEMS = [
+      { itemId: 'wheat',      price: 5,  stock: -1 },
+      { itemId: 'carrot',     price: 8,  stock: -1 },
+      { itemId: 'tomato',     price: 12, stock: -1 },
+      { itemId: 'corn',       price: 15, stock: -1 },
+      { itemId: 'pumpkin',    price: 20, stock: -1 },
+      { itemId: 'strawberry', price: 25, stock: -1 },
+      { itemId: 'hoe',         price: 50,  stock: -1 },
+      { itemId: 'watering_can',price: 75,  stock: -1 },
+      { itemId: 'scythe',      price: 100, stock: -1 },
+      { itemId: 'fertilizer',  price: 30,  stock: -1 },
+    ];
+
+    const ENERGY_COSTS = { till: 5, plant: 3, water: 2, harvest: 4, use_item: 2 };
+    const SYNC_INTERVAL_MS = 5000;
+    const FARM_ROWS = 6;
+    const FARM_COLS = 8;
+    const TOTAL_SLOTS = FARM_ROWS * FARM_COLS;
+
+    // ============================================================
+    // SHARED VALIDATION (matches shared/validation.ts)
+    // ============================================================
+
+    function applyGrowthTicks(state, now) {
+      const elapsed = now - state.lastTickAt;
+      if (elapsed <= 0) return;
+
+      for (let i = 0; i < state.farm.length; i++) {
+        const slot = state.farm[i];
+        if (slot.state === 'planted' && slot.cropId && slot.plantedAt !== null) {
+          const crop = CROPS[slot.cropId];
+          if (!crop) continue;
+          let timeSincePlant = now - slot.plantedAt;
+          if (slot.wateredAt !== null && slot.wateredAt > slot.plantedAt) {
+            const waterDuration = now - slot.wateredAt;
+            const preWaterDuration = slot.wateredAt - slot.plantedAt;
+            timeSincePlant = preWaterDuration + waterDuration * crop.waterBonus;
+          }
+          slot.growthProgress = Math.min(1.0, timeSincePlant / crop.growTimeMs);
+          if (slot.growthProgress >= 1.0) slot.state = 'ready';
+        }
+      }
+
+      const secondsPassed = Math.floor(elapsed / 1000);
+      const energyRegen = Math.floor(secondsPassed / 5);
+      if (energyRegen > 0) {
+        state.energy = Math.min(state.maxEnergy, state.energy + energyRegen);
+      }
+      state.lastTickAt = now;
+    }
+
+    function validateAction(state, action) {
+      switch (action.type) {
+        case 'till': {
+          if (!hasItem(state, 'hoe')) return { valid: false, reason: 'No hoe' };
+          if (action.slotIndex < 0 || action.slotIndex >= TOTAL_SLOTS) return { valid: false, reason: 'Invalid slot' };
+          if (state.energy < ENERGY_COSTS.till) return { valid: false, reason: 'No energy' };
+          if (state.farm[action.slotIndex].state !== 'empty') return { valid: false, reason: 'Not empty' };
+          return { valid: true };
+        }
+        case 'plant': {
+          if (!CROPS[action.cropId]) return { valid: false, reason: 'Invalid crop' };
+          if (action.slotIndex < 0 || action.slotIndex >= TOTAL_SLOTS) return { valid: false, reason: 'Invalid slot' };
+          if (state.energy < ENERGY_COSTS.plant) return { valid: false, reason: 'No energy' };
+          if (!hasItem(state, action.cropId, 1)) return { valid: false, reason: 'No seeds' };
+          if (state.farm[action.slotIndex].state !== 'tilled') return { valid: false, reason: 'Not tilled' };
+          return { valid: true };
+        }
+        case 'water': {
+          if (!hasItem(state, 'watering_can')) return { valid: false, reason: 'No watering can' };
+          if (action.slotIndex < 0 || action.slotIndex >= TOTAL_SLOTS) return { valid: false, reason: 'Invalid slot' };
+          if (state.energy < ENERGY_COSTS.water) return { valid: false, reason: 'No energy' };
+          if (state.farm[action.slotIndex].state !== 'planted') return { valid: false, reason: 'Not planted' };
+          return { valid: true };
+        }
+        case 'harvest': {
+          if (!hasItem(state, 'scythe')) return { valid: false, reason: 'No scythe' };
+          if (action.slotIndex < 0 || action.slotIndex >= TOTAL_SLOTS) return { valid: false, reason: 'Invalid slot' };
+          if (state.energy < ENERGY_COSTS.harvest) return { valid: false, reason: 'No energy' };
+          if (state.farm[action.slotIndex].state !== 'ready') return { valid: false, reason: 'Not ready' };
+          return { valid: true };
+        }
+        case 'buy': {
+          if (!ITEMS[action.itemId]) return { valid: false, reason: 'Invalid item' };
+          if (action.quantity <= 0 || action.quantity > 99) return { valid: false, reason: 'Bad qty' };
+          const shop = SHOP_ITEMS.find(s => s.itemId === action.itemId);
+          if (!shop) return { valid: false, reason: 'Not in shop' };
+          if (state.coins < shop.price * action.quantity) return { valid: false, reason: 'No coins' };
+          return { valid: true };
+        }
+        case 'sell': {
+          if (!ITEMS[action.itemId]) return { valid: false, reason: 'Invalid item' };
+          if (action.quantity <= 0) return { valid: false, reason: 'Bad qty' };
+          if (!hasItem(state, action.itemId, action.quantity)) return { valid: false, reason: 'Not enough items' };
+          if (!ITEMS[action.itemId].sellPrice) return { valid: false, reason: 'Cannot sell' };
+          return { valid: true };
+        }
+        case 'use_item': {
+          if (action.itemId !== 'fertilizer') return { valid: false, reason: 'Unknown item' };
+          if (!hasItem(state, 'fertilizer', 1)) return { valid: false, reason: 'No fertilizer' };
+          if (action.slotIndex < 0 || action.slotIndex >= TOTAL_SLOTS) return { valid: false, reason: 'Invalid slot' };
+          if (state.farm[action.slotIndex].state !== 'planted') return { valid: false, reason: 'Not planted' };
+          if (state.energy < ENERGY_COSTS.use_item) return { valid: false, reason: 'No energy' };
+          return { valid: true };
+        }
+        default: return { valid: false, reason: 'Unknown action' };
+      }
+    }
+
+    function hasItem(state, itemId, qty = 1) {
+      const item = state.inventory.find(i => i.itemId === itemId);
+      return !!item && item.quantity >= qty;
+    }
+
+    function applyActionLocally(state, action) {
+      switch (action.type) {
+        case 'till': {
+          state.farm[action.slotIndex].state = 'tilled';
+          state.energy -= ENERGY_COSTS.till;
+          break;
+        }
+        case 'plant': {
+          const cropId = action.cropId;
+          const inv = state.inventory.find(i => i.itemId === cropId);
+          if (inv) { inv.quantity--; if (inv.quantity <= 0) state.inventory = state.inventory.filter(i => i.itemId !== cropId); }
+          const slot = state.farm[action.slotIndex];
+          slot.state = 'planted'; slot.cropId = cropId; slot.plantedAt = action.timestamp;
+          slot.wateredAt = null; slot.growthProgress = 0;
+          state.energy -= ENERGY_COSTS.plant;
+          break;
+        }
+        case 'water': {
+          state.farm[action.slotIndex].wateredAt = action.timestamp;
+          state.energy -= ENERGY_COSTS.water;
+          break;
+        }
+        case 'harvest': {
+          const slot = state.farm[action.slotIndex];
+          const cropId = slot.cropId;
+          let inv = state.inventory.find(i => i.itemId === cropId);
+          if (inv) { inv.quantity++; } else { state.inventory.push({ itemId: cropId, quantity: 1 }); }
+          slot.state = 'empty'; slot.cropId = null; slot.plantedAt = null; slot.wateredAt = null; slot.growthProgress = 0;
+          state.energy -= ENERGY_COSTS.harvest;
+          break;
+        }
+        case 'buy': {
+          const totalCost = SHOP_ITEMS.find(s => s.itemId === action.itemId).price * action.quantity;
+          state.coins -= totalCost;
+          let inv = state.inventory.find(i => i.itemId === action.itemId);
+          if (inv) { inv.quantity += action.quantity; } else { state.inventory.push({ itemId: action.itemId, quantity: action.quantity }); }
+          break;
+        }
+        case 'sell': {
+          const itemDef = ITEMS[action.itemId];
+          const inv = state.inventory.find(i => i.itemId === action.itemId);
+          if (inv) { inv.quantity -= action.quantity; if (inv.quantity <= 0) state.inventory = state.inventory.filter(i => i.itemId !== action.itemId); }
+          state.coins += itemDef.sellPrice * action.quantity;
+          break;
+        }
+        case 'use_item': {
+          if (action.itemId === 'fertilizer') {
+            const inv = state.inventory.find(i => i.itemId === 'fertilizer');
+            if (inv) { inv.quantity--; if (inv.quantity <= 0) state.inventory = state.inventory.filter(i => i.itemId !== 'fertilizer'); }
+            const slot = state.farm[action.slotIndex];
+            slot.growthProgress = Math.min(1.0, slot.growthProgress + 0.5);
+            if (slot.growthProgress >= 1.0) slot.state = 'ready';
+            state.energy -= ENERGY_COSTS.use_item;
+          }
+          break;
+        }
+      }
+    }
+
+    // ============================================================
+    // EMOJI MAPPING
+    // ============================================================
+    const CROP_EMOJIS = {
+      wheat: ['🌱', '🌿', '🌾', '🌾'],
+      carrot: ['🌱', '🌿', '🥕', '🥕'],
+      tomato: ['🌱', '🌿', '🍅', '🍅', '🍅'],
+      corn: ['🌱', '🌿', '🌽', '🌽', '🌽'],
+      pumpkin: ['🌱', '🌿', '🎃', '🎃', '🎃'],
+      strawberry: ['🌱', '🌿', '🍓', '🍓', '🍓', '🍓'],
+    };
+    const ITEM_EMOJIS = {
+      wheat: '🌾', carrot: '🥕', tomato: '🍅', corn: '🌽', pumpkin: '🎃', strawberry: '🍓',
+      hoe: '🪓', watering_can: '💧', scythe: '🫳', fertilizer: '🧪', gold_egg: '🥚',
+    };
+
+    // ============================================================
+    // GAME STATE
+    // ============================================================
+    const API_BASE = '';
+    let gameState = null;
+    let authToken = null;
+    let selectedTool = 'select';
+    let selectedCrop = 'wheat';
+    let selectedSlot = -1;
+    let walBuffer = [];          // current WAL being built
+    let pendingWal = null;       // WAL in-flight to server
+    let syncTimer = null;
+    let renderTimer = null;
+
+    // ============================================================
+    // AUTH TABS
+    // ============================================================
+    function switchAuthTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', (tab === 'login' && i === 0) || (tab === 'register' && i === 1));
+      });
+      document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('reg-error').textContent = '';
+    }
+
+    // ============================================================
+    // REGISTER
+    // ============================================================
+    async function doRegister() {
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const password2 = document.getElementById('reg-password2').value;
+      const errDiv = document.getElementById('reg-error');
+      const btn = document.getElementById('reg-btn');
+
+      if (!username || username.length < 2) { errDiv.textContent = 'Name must be at least 2 characters'; return; }
+      if (!/^[a-zA-Z0-9_ ]+$/.test(username)) { errDiv.textContent = 'Only letters, numbers, spaces, underscores'; return; }
+      if (password.length < 4) { errDiv.textContent = 'Password must be at least 4 characters'; return; }
+      if (password !== password2) { errDiv.textContent = 'Passwords do not match'; return; }
+
+      btn.disabled = true; btn.textContent = 'Creating...'; errDiv.textContent = '';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!data.success) { errDiv.textContent = data.error || 'Registration failed'; btn.disabled = false; btn.textContent = '🌱 Create Farm!'; return; }
+
+        authToken = data.token;
+        gameState = data.state;
+        localStorage.setItem('farm_token', authToken);
+        enterGame();
+      } catch (e) {
+        errDiv.textContent = 'Cannot reach server';
+        btn.disabled = false; btn.textContent = '🌱 Create Farm!';
+      }
+    }
+
+    // ============================================================
+    // LOGIN
+    // ============================================================
+    async function doLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errDiv = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      if (!username || !password) { errDiv.textContent = 'Username and password required'; return; }
+
+      btn.disabled = true; btn.textContent = 'Logging in...'; errDiv.textContent = '';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!data.success) { errDiv.textContent = data.error || 'Login failed'; btn.disabled = false; btn.textContent = '🚜 Login & Farm!'; return; }
+
+        authToken = data.token;
+        gameState = data.state;
+        localStorage.setItem('farm_token', authToken);
+        enterGame();
+      } catch (e) {
+        errDiv.textContent = 'Cannot reach server';
+        btn.disabled = false; btn.textContent = '🚜 Login & Farm!';
+      }
+    }
+
+    // Auto-reconnect on load
+    (async function tryReconnect() {
+      const token = localStorage.getItem('farm_token');
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (data.success && data.state) {
+          authToken = data.token || token;
+          gameState = data.state;
+          localStorage.setItem('farm_token', authToken);
+          enterGame();
+        } else {
+          localStorage.removeItem('farm_token');
+        }
+      } catch (e) { /* server offline, stay on login */ }
+    })();
+
+    function enterGame() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('active');
+      document.getElementById('player-name-display').textContent = gameState.playerName;
+      buildFarmGrid();
+      renderAll();
+      startSyncLoop();
+      startRenderLoop();
+      notify(`Welcome, ${gameState.playerName}! 🌾`, 'success');
+    }
+
+    // ============================================================
+    // FARM GRID
+    // ============================================================
+    function buildFarmGrid() {
+      const grid = document.getElementById('farm-grid');
+      grid.innerHTML = '';
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'farm-slot empty';
+        slot.dataset.index = i;
+        slot.addEventListener('click', () => onSlotClick(i));
+        grid.appendChild(slot);
+      }
+    }
+
+    function onSlotClick(index) {
+      applyGrowthTicks(gameState, Date.now());
+      const slot = gameState.farm[index];
+      let action = null;
+
+      switch (selectedTool) {
+        case 'select':
+          selectedSlot = index;
+          renderFarm();
+          return;
+
+        case 'hoe':
+          if (slot.state === 'empty') {
+            action = { type: 'till', slotIndex: index, timestamp: Date.now() };
+          } else { notify('Slot is not empty!', 'error'); }
+          break;
+
+        case 'plant':
+          if (slot.state === 'tilled') {
+            if (!hasItem(gameState, selectedCrop, 1)) { notify(`No ${selectedCrop} seeds!`, 'error'); return; }
+            action = { type: 'plant', slotIndex: index, cropId: selectedCrop, timestamp: Date.now() };
+          } else { notify('Till the soil first!', 'error'); }
+          break;
+
+        case 'water':
+          if (slot.state === 'planted') {
+            action = { type: 'water', slotIndex: index, timestamp: Date.now() };
+          } else { notify('Nothing to water here!', 'error'); }
+          break;
+
+        case 'harvest':
+          if (slot.state === 'ready') {
+            action = { type: 'harvest', slotIndex: index, timestamp: Date.now() };
+          } else { notify('Crop is not ready yet!', 'error'); }
+          break;
+
+        case 'fertilize':
+          if (slot.state === 'planted') {
+            if (!hasItem(gameState, 'fertilizer', 1)) { notify('No fertilizer!', 'error'); return; }
+            action = { type: 'use_item', itemId: 'fertilizer', slotIndex: index, timestamp: Date.now() };
+          } else { notify('Nothing to fertilize!', 'error'); }
+          break;
+      }
+
+      if (action) {
+        const validation = validateAction(gameState, action);
+        if (!validation.valid) { notify(validation.reason, 'error'); return; }
+        applyActionLocally(gameState, action);
+        walBuffer.push(action);
+        spawnParticle(index, action.type);
+        renderAll();
+      }
+    }
+
+    // ============================================================
+    // TOOL SELECTION
+    // ============================================================
+    function selectTool(tool) {
+      selectedTool = tool;
+      document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+      });
+    }
+
+    // ============================================================
+    // RENDERING
+    // ============================================================
+    function renderAll() {
+      renderStats();
+      renderFarm();
+      renderInventory();
+      renderShop();
+    }
+
+    function renderStats() {
+      document.getElementById('coins-display').textContent = gameState.coins;
+      document.getElementById('level-display').textContent = gameState.level;
+      document.getElementById('xp-display').textContent = gameState.xp;
+      document.getElementById('energy-display').textContent = `${Math.floor(gameState.energy)}/${gameState.maxEnergy}`;
+      document.getElementById('energy-bar').style.width = `${(gameState.energy / gameState.maxEnergy) * 100}%`;
+    }
+
+    function renderFarm() {
+      applyGrowthTicks(gameState, Date.now());
+      const slots = document.querySelectorAll('.farm-slot');
+      slots.forEach((el, i) => {
+        const slot = gameState.farm[i];
+        el.className = `farm-slot ${slot.state}${selectedSlot === i ? ' selected' : ''}`;
+        let emoji = '', progressHTML = '', waterHTML = '';
+
+        switch (slot.state) {
+          case 'empty': emoji = '🟩'; break;
+          case 'tilled': emoji = '🟫'; break;
+          case 'planted':
+            if (slot.cropId) {
+              const stageEmojis = CROP_EMOJIS[slot.cropId] || ['🌱'];
+              const stageIdx = Math.min(Math.floor(slot.growthProgress * (stageEmojis.length - 1)), stageEmojis.length - 1);
+              emoji = stageEmojis[stageIdx];
+              const pct = Math.floor(slot.growthProgress * 100);
+              progressHTML = `<div class="slot-progress"><div class="slot-progress-fill" style="width:${pct}%"></div></div>`;
+              if (slot.wateredAt !== null) waterHTML = '<span class="slot-water-indicator">💧</span>';
+            }
+            break;
+          case 'ready':
+            if (slot.cropId) {
+              const stageEmojis = CROP_EMOJIS[slot.cropId] || ['🌱'];
+              emoji = stageEmojis[stageEmojis.length - 1];
+            }
+            break;
+        }
+        el.innerHTML = `<span class="slot-crop">${emoji}</span>${progressHTML}${waterHTML}`;
+      });
+    }
+
+    function renderInventory() {
+      const panel = document.getElementById('inventory-panel');
+      if (!gameState.inventory.length) {
+        panel.innerHTML = '<p style="color:var(--text-dark);text-align:center;padding:20px;">Empty inventory</p>';
+        return;
+      }
+      let html = '';
+      for (const inv of gameState.inventory) {
+        const item = ITEMS[inv.itemId];
+        if (!item) continue;
+        const emoji = ITEM_EMOJIS[inv.itemId] || '📦';
+        const isSelected = inv.itemId === selectedCrop && selectedTool === 'plant';
+        html += `<div class="inv-item${isSelected ? ' selected' : ''}" onclick="selectInventoryItem('${inv.itemId}')">
+          <span class="item-icon">${emoji}</span>
+          <div class="item-info">
+            <div class="item-name">${item.name}</div>
+            <div class="item-qty">x${inv.quantity}</div>
+          </div>
+          <div class="item-actions">
+            ${item.sellPrice ? `<button class="item-btn sell" onclick="event.stopPropagation();sellItem('${inv.itemId}')">Sell ${item.sellPrice}🪙</button>` : ''}
+            ${CROPS[inv.itemId] ? `<button class="item-btn" onclick="event.stopPropagation();selectCropForPlant('${inv.itemId}')">🌱</button>` : ''}
+          </div>
+        </div>`;
+      }
+      panel.innerHTML = html;
+    }
+
+    function renderShop() {
+      const panel = document.getElementById('shop-panel');
+      let html = '<div style="margin-bottom:8px;font-size:12px;color:var(--text-dark);">Buy seeds, tools & supplies</div>';
+      for (const shopItem of SHOP_ITEMS) {
+        const item = ITEMS[shopItem.itemId];
+        const emoji = ITEM_EMOJIS[shopItem.itemId] || '📦';
+        const canBuy = gameState.coins >= shopItem.price;
+        html += `<div class="shop-item">
+          <span class="item-icon">${emoji}</span>
+          <div class="item-info">
+            <div class="item-name">${item.name}</div>
+            <div class="item-price">${shopItem.price} 🪙</div>
+          </div>
+          <button class="buy-btn" ${canBuy ? '' : 'disabled'} onclick="buyItem('${shopItem.itemId}')">Buy</button>
+        </div>`;
+      }
+      panel.innerHTML = html;
+    }
+
+    function selectInventoryItem(itemId) {
+      if (CROPS[itemId]) selectCropForPlant(itemId);
+    }
+
+    function selectCropForPlant(cropId) {
+      selectedCrop = cropId;
+      selectedTool = 'plant';
+      document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === 'plant');
+      });
+      notify(`Selected ${CROPS[cropId].name} to plant`, 'info');
+      renderInventory();
+    }
+
+    // ============================================================
+    // SHOP / BUY / SELL
+    // ============================================================
+    function buyItem(itemId) {
+      const shopItem = SHOP_ITEMS.find(s => s.itemId === itemId);
+      if (!shopItem) return;
+      if (gameState.coins < shopItem.price) { notify('Not enough coins!', 'error'); return; }
+      const action = { type: 'buy', itemId, quantity: 1, timestamp: Date.now() };
+      const validation = validateAction(gameState, action);
+      if (!validation.valid) { notify(validation.reason, 'error'); return; }
+      applyActionLocally(gameState, action);
+      walBuffer.push(action);
+      notify(`Bought ${ITEMS[itemId].name}!`, 'success');
+      renderAll();
+    }
+
+    function sellItem(itemId) {
+      if (!hasItem(gameState, itemId, 1)) { notify('Nothing to sell!', 'error'); return; }
+      const itemDef = ITEMS[itemId];
+      if (!itemDef.sellPrice) { notify('Cannot sell this item!', 'error'); return; }
+      const action = { type: 'sell', itemId, quantity: 1, timestamp: Date.now() };
+      const validation = validateAction(gameState, action);
+      if (!validation.valid) { notify(validation.reason, 'error'); return; }
+      applyActionLocally(gameState, action);
+      walBuffer.push(action);
+      notify(`Sold ${itemDef.name} for ${itemDef.sellPrice}🪙!`, 'success');
+      renderAll();
+    }
+
+    // ============================================================
+    // PANEL TABS
+    // ============================================================
+    function switchTab(tab) {
+      document.querySelectorAll('.panel-tab').forEach((t, i) => {
+        t.classList.toggle('active', (tab === 'inventory' && i === 0) || (tab === 'shop' && i === 1));
+      });
+      document.getElementById('inventory-panel').classList.toggle('hidden', tab !== 'inventory');
+      document.getElementById('shop-panel').classList.toggle('hidden', tab !== 'shop');
+    }
+
+    // ============================================================
+    // WAL SYNC ENGINE
+    // ============================================================
+    function startSyncLoop() {
+      syncTimer = setInterval(syncWithServer, SYNC_INTERVAL_MS);
+    }
+
+    function startRenderLoop() {
+      renderTimer = setInterval(() => {
+        applyGrowthTicks(gameState, Date.now());
+        renderFarm();
+        renderStats();
+      }, 1000);
+    }
+
+    async function syncWithServer() {
+      if (!authToken || authToken === 'offline') return;
+      if (pendingWal) return; // previous sync still in flight
+
+      // Grab current WAL buffer (can be empty for heartbeat sync)
+      // PlayerId is NOT sent - server resolves it from auth token
+      pendingWal = {
+        version: gameState.version,
+        actions: [...walBuffer],
+        createdAt: Date.now(),
+      };
+      walBuffer = []; // new buffer for incoming actions during sync
+
+      setSyncStatus('syncing');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ wal: pendingWal }),
+        });
+
+        const data = await res.json();
+
+        if (res.status === 423) {
+          // Locked - put actions back
+          walBuffer = [...pendingWal.actions, ...walBuffer];
+          setSyncStatus('retrying');
+          pendingWal = null;
+          return;
+        }
+
+        if (data.success && data.state) {
+          // Replace local state with authoritative server state
+          gameState = data.state;
+          setSyncStatus('ok');
+          if (data.rejectedActions && data.rejectedActions.length > 0) {
+            for (const rej of data.rejectedActions) {
+              notify(`Server rejected #${rej.index}: ${rej.reason}`, 'error');
+            }
+          }
+          renderAll();
+        } else {
+          walBuffer = [...pendingWal.actions, ...walBuffer];
+          setSyncStatus('error');
+          notify(`Sync error: ${data.error}`, 'error');
+        }
+      } catch (err) {
+        walBuffer = [...pendingWal.actions, ...walBuffer];
+        setSyncStatus('error');
+        console.warn('Sync failed:', err);
+      } finally {
+        pendingWal = null;
+      }
+    }
+
+    function setSyncStatus(status) {
+      const indicator = document.getElementById('sync-indicator');
+      const text = document.getElementById('sync-status');
+      indicator.className = 'sync-indicator';
+      switch (status) {
+        case 'syncing':
+          indicator.classList.add('syncing');
+          text.textContent = 'Syncing...';
+          break;
+        case 'ok':
+          text.textContent = `Synced ${new Date().toLocaleTimeString()}`;
+          break;
+        case 'error':
+          indicator.classList.add('error');
+          text.textContent = 'Sync error';
+          break;
+        case 'retrying':
+          indicator.classList.add('syncing');
+          text.textContent = 'Retrying...';
+          break;
+        default:
+          text.textContent = 'Ready';
+      }
+    }
+
+    // ============================================================
+    // NOTIFICATIONS
+    // ============================================================
+    function notify(message, type = 'info') {
+      const container = document.getElementById('notifications');
+      const el = document.createElement('div');
+      el.className = `notification ${type}`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    // ============================================================
+    // PARTICLES
+    // ============================================================
+    function spawnParticle(slotIndex, actionType) {
+      const slots = document.querySelectorAll('.farm-slot');
+      const slot = slots[slotIndex];
+      if (!slot) return;
+      const emojis = {
+        till: ['🟫', '⛏️'], plant: ['🌱', '✨'], water: ['💧', '💦'],
+        harvest: ['🌟', '⭐', '✨'], use_item: ['🧪', '✨'],
+      };
+      const choices = emojis[actionType] || ['✨'];
+      const emoji = choices[Math.floor(Math.random() * choices.length)];
+      const el = document.createElement('div');
+      el.className = 'particle';
+      el.textContent = emoji;
+      el.style.left = slot.offsetLeft + slot.offsetWidth / 2 + 'px';
+      el.style.top = slot.offsetTop + 'px';
+      slot.parentElement.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    // ============================================================
+    // KEYBOARD SHORTCUTS
+    // ============================================================
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return;
+      switch (e.key) {
+        case '1': selectTool('select'); break;
+        case '2': selectTool('hoe'); break;
+        case '3': selectTool('plant'); break;
+        case '4': selectTool('water'); break;
+        case '5': selectTool('harvest'); break;
+        case '6': selectTool('fertilize'); break;
+      }
+    });
+
+    // Enter key on forms
+    document.getElementById('login-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('login-username').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('reg-password2').addEventListener('keydown', (e) => { if (e.key === 'Enter') doRegister(); });
+
+    // ============================================================
+    // HACKER MODE - Press H to toggle hacker panel
+    // ============================================================
+    let hackerPanelOpen = false;
+    let infiniteEnergy = false;
+
+    function toggleHackerPanel() {
+      hackerPanelOpen = !hackerPanelOpen;
+      document.getElementById('hacker-panel').classList.toggle('open', hackerPanelOpen);
+      document.getElementById('hacker-badge').style.display = hackerPanelOpen ? 'block' : 'none';
+    }
+
+    function hlog(msg, cls = '') {
+      const el = document.getElementById('hack-log');
+      const ts = new Date().toLocaleTimeString();
+      el.innerHTML += '<div class="' + cls + '">[' + ts + '] ' + msg + '</div>';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function hackClearLog() {
+      document.getElementById('hack-log').innerHTML = '';
+    }
+
+    // --- LOCAL CHEATS (modify gameState directly, server will reject on sync) ---
+    function hackGiveCoins(amount) {
+      gameState.coins += amount;
+      hlog('+' + amount + ' coins (local only - server will reject on sync)', 'hl-warn');
+      notify('+' + amount + ' coins (local cheat)', 'success');
+      renderAll();
+    }
+
+    function hackRefillEnergy() {
+      gameState.energy = gameState.maxEnergy;
+      hlog('Energy refilled to ' + gameState.maxEnergy, 'hl-ok');
+      notify('Energy refilled!', 'success');
+      renderAll();
+    }
+
+    function hackSetMaxEnergy(val) {
+      gameState.maxEnergy = val;
+      gameState.energy = val;
+      hlog('Max energy set to ' + val, 'hl-ok');
+      renderAll();
+    }
+
+    function hackInfiniteEnergy() {
+      infiniteEnergy = !infiniteEnergy;
+      hlog('Infinite energy: ' + (infiniteEnergy ? 'ON' : 'OFF'), infiniteEnergy ? 'hl-ok' : 'hl-warn');
+      if (infiniteEnergy) {
+        setInterval(() => { if (infiniteEnergy) gameState.energy = gameState.maxEnergy; }, 500);
+      }
+    }
+
+    function hackGrowAll() {
+      for (let i = 0; i < gameState.farm.length; i++) {
+        if (gameState.farm[i].state === 'planted') {
+          gameState.farm[i].growthProgress = 1.0;
+          gameState.farm[i].state = 'ready';
+        }
+      }
+      hlog('All planted crops set to ready', 'hl-ok');
+      notify('All crops grown!', 'success');
+      renderAll();
+    }
+
+    function hackHarvestAll() {
+      let count = 0;
+      for (let i = 0; i < gameState.farm.length; i++) {
+        if (gameState.farm[i].state === 'ready') {
+          const cropId = gameState.farm[i].cropId;
+          let inv = gameState.inventory.find(x => x.itemId === cropId);
+          if (inv) { inv.quantity++; } else { gameState.inventory.push({ itemId: cropId, quantity: 1 }); }
+          gameState.farm[i] = { state: 'empty', cropId: null, plantedAt: null, wateredAt: null, growthProgress: 0 };
+          count++;
+        }
+      }
+      hlog('Harvested ' + count + ' crops (local)', 'hl-ok');
+      renderAll();
+    }
+
+    function hackTillAll() {
+      let count = 0;
+      for (let i = 0; i < gameState.farm.length; i++) {
+        if (gameState.farm[i].state === 'empty') {
+          gameState.farm[i].state = 'tilled';
+          count++;
+        }
+      }
+      hlog('Tilled ' + count + ' slots (local)', 'hl-ok');
+      renderAll();
+    }
+
+    function hackPlantAll(cropId) {
+      let count = 0;
+      for (let i = 0; i < gameState.farm.length; i++) {
+        if (gameState.farm[i].state === 'tilled') {
+          gameState.farm[i] = { state: 'planted', cropId: cropId, plantedAt: Date.now(), wateredAt: null, growthProgress: 0 };
+          count++;
+        }
+      }
+      hlog('Planted ' + cropId + ' in ' + count + ' slots (local)', 'hl-ok');
+      renderAll();
+    }
+
+    function hackWaterAll() {
+      let count = 0;
+      for (let i = 0; i < gameState.farm.length; i++) {
+        if (gameState.farm[i].state === 'planted') {
+          gameState.farm[i].wateredAt = Date.now();
+          count++;
+        }
+      }
+      hlog('Watered ' + count + ' crops (local)', 'hl-ok');
+      renderAll();
+    }
+
+    function hackGiveAllTools() {
+      ['hoe', 'watering_can', 'scythe'].forEach(tool => {
+        if (!hasItem(gameState, tool, 1)) {
+          gameState.inventory.push({ itemId: tool, quantity: 1 });
+        }
+      });
+      hlog('All tools granted', 'hl-ok');
+      renderAll();
+    }
+
+    function hackGiveSeeds(qty) {
+      ['wheat', 'carrot', 'tomato', 'corn', 'pumpkin', 'strawberry'].forEach(crop => {
+        let inv = gameState.inventory.find(x => x.itemId === crop);
+        if (inv) { inv.quantity += qty; } else { gameState.inventory.push({ itemId: crop, quantity: qty }); }
+      });
+      hlog('+' + qty + ' of each seed type', 'hl-ok');
+      renderAll();
+    }
+
+    function hackGiveFertilizer(qty) {
+      let inv = gameState.inventory.find(x => x.itemId === 'fertilizer');
+      if (inv) { inv.quantity += qty; } else { gameState.inventory.push({ itemId: 'fertilizer', quantity: qty }); }
+      hlog('+' + qty + ' fertilizer', 'hl-ok');
+      renderAll();
+    }
+
+    function hackGiveItem(itemId, qty) {
+      let inv = gameState.inventory.find(x => x.itemId === itemId);
+      if (inv) { inv.quantity += qty; } else { gameState.inventory.push({ itemId: itemId, quantity: qty }); }
+      hlog('+' + qty + ' ' + itemId, 'hl-ok');
+      renderAll();
+    }
+
+    function hackSetLevel(lvl) {
+      gameState.level = lvl;
+      hlog('Level set to ' + lvl, 'hl-ok');
+      renderAll();
+    }
+
+    function hackGiveXP(xp) {
+      gameState.xp += xp;
+      hlog('+' + xp + ' XP', 'hl-ok');
+      renderAll();
+    }
+
+    // --- FORGE WAL EXPLOITS (test server validation) ---
+    async function hackForgeWAL_NegativeCoins() {
+      hlog('--- ATTACK: Sell items you don\'t have ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'sell', itemId: 'gold_egg', quantity: 9999, timestamp: Date.now() },
+        { type: 'sell', itemId: 'gold_egg', quantity: -1, timestamp: Date.now() },
+      ], createdAt: Date.now() };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      if (data.success) { hlog('SYNCED! State returned: coins=' + data.state.coins, 'hl-err'); gameState = data.state; renderAll(); }
+      else { hlog('BLOCKED: ' + JSON.stringify(data.rejectedActions || data.error), 'hl-ok'); }
+    }
+
+    async function hackForgeWAL_FutureTimestamp() {
+      hlog('--- ATTACK: Future timestamp ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'till', slotIndex: 0, timestamp: Date.now() + 300000 },
+      ], createdAt: Date.now() + 300000 };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      if (data.rejectedActions && data.rejectedActions.length) { hlog('BLOCKED: ' + data.rejectedActions[0].reason, 'hl-ok'); }
+      else if (data.success) { hlog('SYNCED (unexpected!)', 'hl-err'); gameState = data.state; renderAll(); }
+      else { hlog('REJECTED: ' + data.error, 'hl-ok'); }
+    }
+
+    async function hackForgeWAL_PastTimestamp() {
+      hlog('--- ATTACK: Very old timestamp (1 year ago) ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'till', slotIndex: 0, timestamp: Date.now() - 86400000 * 365 },
+      ], createdAt: Date.now() };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      if (data.rejectedActions && data.rejectedActions.length) { hlog('BLOCKED: ' + data.rejectedActions[0].reason, 'hl-ok'); }
+      else if (data.success) { hlog('SYNCED (unexpected!)', 'hl-err'); } 
+      else { hlog('REJECTED: ' + data.error, 'hl-ok'); }
+    }
+
+    async function hackForgeWAL_OutOfOrder() {
+      hlog('--- ATTACK: Out-of-order timestamps ---', 'hl-info');
+      const now = Date.now();
+      const wal = { version: gameState.version, actions: [
+        { type: 'till', slotIndex: 0, timestamp: now + 5000 },
+        { type: 'till', slotIndex: 1, timestamp: now + 3000 },  // backwards!
+      ], createdAt: now };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      if (data.rejectedActions && data.rejectedActions.length) { hlog('BLOCKED: ' + data.rejectedActions.length + ' rejected, reason: ' + data.rejectedActions[0].reason, 'hl-ok'); }
+      else if (data.success) { hlog('SYNCED (unexpected!)', 'hl-err'); gameState = data.state; renderAll(); }
+      else { hlog('REJECTED: ' + data.error, 'hl-ok'); }
+    }
+
+    async function hackForgeWAL_NegativeQuantity() {
+      hlog('--- ATTACK: Negative sell quantity ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'sell', itemId: 'wheat', quantity: -100, timestamp: Date.now() },
+        { type: 'buy', itemId: 'wheat', quantity: -50, timestamp: Date.now() },
+      ], createdAt: Date.now() };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      hlog('Rejected: ' + (data.rejectedActions ? data.rejectedActions.length : 0) + ' actions', data.rejectedActions?.length ? 'hl-ok' : 'hl-err');
+    }
+
+    async function hackForgeWAL_InvalidSlot() {
+      hlog('--- ATTACK: Invalid slot index ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'till', slotIndex: -1, timestamp: Date.now() },
+        { type: 'till', slotIndex: 999, timestamp: Date.now() },
+      ], createdAt: Date.now() };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      hlog('Rejected: ' + (data.rejectedActions ? data.rejectedActions.length : 0) + ' actions', data.rejectedActions?.length ? 'hl-ok' : 'hl-err');
+    }
+
+    async function hackForgeWAL_Massive() {
+      hlog('--- ATTACK: 1000 action WAL flood ---', 'hl-info');
+      const actions = [];
+      for (let i = 0; i < 1000; i++) {
+        actions.push({ type: 'till', slotIndex: i % 48, timestamp: Date.now() });
+      }
+      const wal = { version: gameState.version, actions, createdAt: Date.now() };
+      const start = performance.now();
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      const ms = Math.floor(performance.now() - start);
+      hlog('Response in ' + ms + 'ms. Rejected: ' + (data.rejectedActions ? data.rejectedActions.length : '?') + '/' + actions.length, 'hl-warn');
+      if (data.success) { gameState = data.state; renderAll(); }
+    }
+
+    async function hackForgeWAL_UnknownAction() {
+      hlog('--- ATTACK: Unknown action types ---', 'hl-info');
+      const wal = { version: gameState.version, actions: [
+        { type: 'hack_coins', amount: 999999, timestamp: Date.now() },
+        { type: 'delete_all', timestamp: Date.now() },
+        { timestamp: Date.now() },
+        { type: null, timestamp: Date.now() },
+      ], createdAt: Date.now() };
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ wal }) });
+      const data = await res.json();
+      hlog('Rejected: ' + (data.rejectedActions ? data.rejectedActions.length : 0) + '/' + wal.actions.length, data.rejectedActions?.length === wal.actions.length ? 'hl-ok' : 'hl-err');
+    }
+
+    async function hackRunAll() {
+      hlog('========= RUNNING ALL EXPLOIT TESTS =========', 'hl-info');
+      await hackForgeWAL_NegativeCoins();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_FutureTimestamp();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_PastTimestamp();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_OutOfOrder();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_NegativeQuantity();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_InvalidSlot();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_Massive();
+      await new Promise(r => setTimeout(r, 300));
+      await hackForgeWAL_UnknownAction();
+      hlog('========= ALL TESTS COMPLETE =========', 'hl-info');
+    }
+
+    // H key to toggle hacker panel
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return;
+      if (e.key === 'h' || e.key === 'H') toggleHackerPanel();
+    });
+  </script>
+</body>
+</html>
