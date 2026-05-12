@@ -38,6 +38,7 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || '';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const MASTER_KEY = process.env.MASTER_KEY || '';
 
 if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT) {
   webpush.default.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -45,6 +46,26 @@ if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT) {
 
 const PUSH_SUBS_FILE = join(DATA_DIR, 'push-subs.json');
 const pushSubscriptions = new Map(); // playerId -> subscription
+
+const BANNED_EMAILS_FILE = join(DATA_DIR, 'banned-emails.json');
+const bannedEmails = new Set();
+
+function loadBannedEmails() {
+  try {
+    if (existsSync(BANNED_EMAILS_FILE)) {
+      const data = JSON.parse(readFileSync(BANNED_EMAILS_FILE, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const email of data) bannedEmails.add(email.toLowerCase());
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function saveBannedEmails() {
+  try {
+    writeFileSync(BANNED_EMAILS_FILE, JSON.stringify(Array.from(bannedEmails)));
+  } catch (e) { console.error('[BAN] Failed to save banned emails:', e.message); }
+}
 
 function loadPushSubs() {
   try {
@@ -518,6 +539,13 @@ function getPlayerFromAuth(authHeader) {
   if (state) {
     applyGrowthTicks(state, Date.now(), true);
   }
+  // Check if account is banned
+  const account = accounts.get(state.playerName.trim().toLowerCase());
+  if (account && account.banned) {
+    sessions.delete(token);
+    debouncedSaveSessions();
+    return null;
+  }
   return state || null;
 }
 
@@ -722,7 +750,13 @@ async function handleRequest(req) {
         if (!nameValidation.valid) return jsonResp({ success: false, error: nameValidation.reason }, 400, origin);
 
         const trimmed = trimmedUsername.toLowerCase();
-        if (accounts.has(trimmed)) return jsonResp({ success: false, error: 'Username already taken' }, 409, origin);
+        const existingAccount = accounts.get(trimmed);
+        if (existingAccount) {
+          if (existingAccount.banned) {
+            return jsonResp({ success: false, error: 'This username has been suspended' }, 403, origin);
+          }
+          return jsonResp({ success: false, error: 'Username already taken' }, 409, origin);
+        }
         if (password.length < MIN_PASSWORD_LENGTH) return jsonResp({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400, origin);
 
         let playerId;
@@ -800,6 +834,10 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'Invalid username or password' }, 401, origin);
         }
 
+        if (account.banned) {
+          return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
+        }
+
         const { valid, needsRehash } = await verifyPassword(password, account.passwordHash);
         if (!valid) {
           const justLocked = recordFailedLogin(trimmed);
@@ -871,7 +909,12 @@ async function handleRequest(req) {
         }
 
         const googleId = googlePayload.sub;
-        const googleEmail = googlePayload.email || '';
+        const googleEmail = (googlePayload.email || '').toLowerCase();
+
+        // Check if email is globally banned
+        if (bannedEmails.has(googleEmail)) {
+          return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
+        }
 
         // Find account by googleId
         let account = null;
@@ -882,6 +925,11 @@ async function handleRequest(req) {
             accountKey = key;
             break;
           }
+        }
+
+        // Check if existing account is banned
+        if (account && account.banned) {
+          return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
         }
 
         // If not found by googleId, need to create new account
@@ -898,7 +946,11 @@ async function handleRequest(req) {
           }
 
           const username = trimmedUsername.toLowerCase();
-          if (accounts.has(username)) {
+          const existingAccount = accounts.get(username);
+          if (existingAccount) {
+            if (existingAccount.banned) {
+              return jsonResp({ success: false, error: 'This username has been suspended' }, 403, origin);
+            }
             return jsonResp({ success: false, error: 'Username already taken' }, 409, origin);
           }
 
@@ -1279,6 +1331,259 @@ async function handleRequest(req) {
         return jsonResp({ success: true }, 200, origin);
       }
 
+      // --- Admin: Delete User ---
+      if (path === '/api/admin/delete-user') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, masterKey } = body;
+        if (!username || !masterKey) {
+          return jsonResp({ success: false, error: 'Username and masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+
+        const trimmed = username.trim().toLowerCase();
+        const account = accounts.get(trimmed);
+        if (!account) {
+          return jsonResp({ success: false, error: 'User not found' }, 404, origin);
+        }
+
+        // Delete player state file
+        const playerFile = join(PLAYERS_DIR, account.playerId + '.json');
+        try {
+          if (existsSync(playerFile)) {
+            const { unlinkSync } = await import('fs');
+            unlinkSync(playerFile);
+          }
+        } catch (e) {
+          console.error('[ADMIN] Failed to delete player file:', e.message);
+        }
+
+        // Remove from in-memory stores
+        players.delete(account.playerId);
+        accounts.delete(trimmed);
+
+        // Delete any sessions for this player
+        let sessionsDeleted = 0;
+        for (const [token, session] of sessions) {
+          if (session.playerId === account.playerId) {
+            sessions.delete(token);
+            sessionsDeleted++;
+          }
+        }
+        if (sessionsDeleted > 0) {
+          debouncedSaveSessions();
+        }
+
+        // Remove push subscription if any
+        if (pushSubscriptions.has(account.playerId)) {
+          pushSubscriptions.delete(account.playerId);
+          savePushSubs();
+        }
+
+        await saveAccounts();
+
+        console.log(`[ADMIN] Deleted user "${trimmed}" (playerId: ${account.playerId}), sessions removed: ${sessionsDeleted}`);
+        return jsonResp({ success: true, deleted: trimmed }, 200, origin);
+      }
+
+      // --- Admin: Ban User ---
+      if (path === '/api/admin/ban-user') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, email, masterKey } = body;
+        if (!masterKey) {
+          return jsonResp({ success: false, error: 'masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+        if (!username && !email) {
+          return jsonResp({ success: false, error: 'Username or email required' }, 400, origin);
+        }
+
+        const bannedTargets = [];
+
+        // Ban by username
+        if (username) {
+          const trimmed = username.trim().toLowerCase();
+          const account = accounts.get(trimmed);
+          if (account) {
+            account.banned = true;
+            // Delete all sessions for this player
+            for (const [token, session] of sessions) {
+              if (session.playerId === account.playerId) {
+                sessions.delete(token);
+              }
+            }
+            debouncedSaveSessions();
+            bannedTargets.push(trimmed);
+            console.log(`[ADMIN] Banned user "${trimmed}" (playerId: ${account.playerId})`);
+          } else {
+            // Create a placeholder banned account so the username can't be registered
+            accounts.set(trimmed, { username: trimmed, banned: true, playerId: null });
+            bannedTargets.push(trimmed);
+            console.log(`[ADMIN] Banned non-existent username "${trimmed}" (placeholder created)`);
+          }
+        }
+
+        // Ban by email
+        if (email) {
+          const emailLower = email.trim().toLowerCase();
+          bannedEmails.add(emailLower);
+          saveBannedEmails();
+          // Also ban any existing account with this email
+          for (const [key, acc] of accounts) {
+            if (acc.googleEmail && acc.googleEmail.toLowerCase() === emailLower) {
+              acc.banned = true;
+              for (const [token, session] of sessions) {
+                if (session.playerId === acc.playerId) {
+                  sessions.delete(token);
+                }
+              }
+              bannedTargets.push(key);
+              console.log(`[ADMIN] Banned account with email "${emailLower}" (username: ${key})`);
+            }
+          }
+        }
+
+        await saveAccounts();
+
+        return jsonResp({ success: true, banned: bannedTargets }, 200, origin);
+      }
+
+      // --- Admin: Create User (bypasses validation) ---
+      if (path === '/api/admin/create-user') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, password, masterKey } = body;
+        if (!username || !password || !masterKey) {
+          return jsonResp({ success: false, error: 'Username, password and masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+
+        const trimmed = username.trim().toLowerCase();
+        if (accounts.has(trimmed)) {
+          return jsonResp({ success: false, error: 'Username already taken' }, 409, origin);
+        }
+
+        let playerId;
+        do {
+          playerId = generatePlayerId();
+        } while (players.has(playerId));
+
+        const now = Date.now();
+        const state = createDefaultPlayerState(playerId, trimmed, now);
+        players.set(playerId, state);
+
+        const passwordHash = await hashPasswordPBKDF2(password);
+        accounts.set(trimmed, { username: trimmed, passwordHash, playerId });
+
+        await Promise.all([savePlayer(playerId, state), saveAccounts()]);
+
+        console.log(`[ADMIN] Created user "${trimmed}" (playerId: ${playerId})`);
+        return jsonResp({ success: true, username: trimmed, playerId }, 200, origin);
+      }
+
+      // --- Admin: Unban User ---
+      if (path === '/api/admin/unban-user') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, email, masterKey } = body;
+        if (!masterKey) {
+          return jsonResp({ success: false, error: 'masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+        if (!username && !email) {
+          return jsonResp({ success: false, error: 'Username or email required' }, 400, origin);
+        }
+
+        const unbannedTargets = [];
+
+        if (username) {
+          const trimmed = username.trim().toLowerCase();
+          const account = accounts.get(trimmed);
+          if (account) {
+            if (account.banned) {
+              delete account.banned;
+              unbannedTargets.push(trimmed);
+              console.log(`[ADMIN] Unbanned user "${trimmed}"`);
+            }
+          }
+        }
+
+        if (email) {
+          const emailLower = email.trim().toLowerCase();
+          if (bannedEmails.has(emailLower)) {
+            bannedEmails.delete(emailLower);
+            saveBannedEmails();
+            unbannedTargets.push(emailLower);
+            console.log(`[ADMIN] Unbanned email "${emailLower}"`);
+          }
+        }
+
+        await saveAccounts();
+
+        if (unbannedTargets.length === 0) {
+          return jsonResp({ success: false, error: 'Nothing to unban' }, 400, origin);
+        }
+
+        return jsonResp({ success: true, unbanned: unbannedTargets }, 200, origin);
+      }
+
       return jsonResp({ error: 'Not found' }, 404, origin);
     }
 
@@ -1418,6 +1723,7 @@ setInterval(checkAndSendPushNotifications, 2 * 60_000);
 
 loadPushSubs();
 loadSessions();
+loadBannedEmails();
 await bootRestore();
 
 const port = 3456;
