@@ -135,6 +135,32 @@
     .stat .label { color: var(--text-dark); font-size: 12px; }
     .stat .value { font-weight: bold; color: var(--gold); }
 
+    .xp-bar-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .xp-bar-track {
+      width: 70px;
+      height: 8px;
+      background: rgba(0,0,0,0.35);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .xp-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #8bc34a);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+    .xp-bar-text {
+      font-size: 9px;
+      color: var(--text-dark);
+      white-space: nowrap;
+    }
+
     .sync-indicator {
       width: 12px; height: 12px;
       border-radius: 50%;
@@ -863,10 +889,13 @@
           <span class="label">Lv</span>
           <span class="value" id="level-display">1</span>
         </div>
-        <div class="stat">
+        <div class="stat xp-bar-stat">
           <span class="icon">✨</span>
           <span class="value" id="xp-display">0</span>
-          <span class="label">XP</span>
+          <div class="xp-bar-track">
+            <div class="xp-bar-fill" id="xp-bar-fill"></div>
+          </div>
+          <span class="xp-bar-text" id="xp-bar-text">0/100</span>
         </div>
         <div class="stat">
           <span class="icon">🧺</span>
@@ -1395,6 +1424,20 @@
       document.getElementById('level-display').textContent = gameState.level;
       document.getElementById('xp-display').textContent = gameState.xp;
       document.getElementById('feed-display').textContent = gameState.feed;
+
+      // XP progress bar
+      const currentLevel = gameState.level;
+      const currentXP = gameState.xp;
+      const xpForCurrentLevel = XP_PER_LEVEL[currentLevel - 1] || 0;
+      const xpForNextLevel = XP_PER_LEVEL[currentLevel] ?? Infinity;
+      const xpNeeded = xpForNextLevel === Infinity ? 0 : xpForNextLevel - xpForCurrentLevel;
+      const xpProgress = xpNeeded > 0 ? currentXP - xpForCurrentLevel : xpNeeded;
+      const pct = xpNeeded > 0 ? Math.min(100, Math.max(0, (xpProgress / xpNeeded) * 100)) : 100;
+
+      document.getElementById('xp-bar-fill').style.width = pct + '%';
+      document.getElementById('xp-bar-text').textContent = xpNeeded > 0
+        ? `${xpProgress}/${xpNeeded}`
+        : 'Max';
     }
 
     function renderFarm() {
