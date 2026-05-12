@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🌾 Happy Harvest - Farm Game</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,12 +34,12 @@
       --dry-dark: #9a8a42;
     }
 
-    body {
+    html, body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: var(--bg);
       color: var(--text);
       overflow: hidden;
-      height: 100vh;
+      height: 100%;
       user-select: none;
     }
 
@@ -115,7 +115,7 @@
     }
 
     /* --- Game UI --- */
-    #game-screen { display: none; height: 100vh; flex-direction: column; }
+    #game-screen { display: none; height: 100%; flex-direction: column; }
     #game-screen.active { display: flex; }
 
     /* Top bar */
@@ -185,6 +185,8 @@
       font-size: clamp(18px, 3vw, 32px);
       border: 2px solid transparent;
       min-height: 60px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .farm-slot:hover { transform: scale(1.08); z-index: 2; }
     .farm-slot.selected { border-color: var(--gold); box-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
@@ -508,11 +510,28 @@
       cursor: pointer;
       font-size: 24px;
       transition: all 0.15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .action-btn:hover { background: var(--btn-hover); }
     .action-btn:active { background: var(--btn-active); }
     .action-btn.active { background: var(--green); border-color: var(--green); }
     .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .panel-toggle-btn {
+      display: none;
+      padding: 4px 8px;
+      background: var(--btn);
+      color: var(--text);
+      border: 2px solid var(--panel-border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .panel-toggle-btn:hover { background: var(--btn-hover); }
 
     /* Notifications */
     .notifications {
@@ -563,6 +582,133 @@
       .side-panel { width: 100%; height: 200px; border-left: none; border-top: 2px solid var(--panel-border); }
       .farm-grid { padding: 8px; gap: 2px; }
       .barn-area { width: 100%; height: 100px; border-left: none; border-top: 2px solid var(--panel-border); }
+    }
+
+    /* Mobile Landscape (phone on its side) */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .top-bar {
+        padding: 4px 8px;
+        gap: 8px;
+        min-height: 32px;
+      }
+      .top-bar .stats { gap: 8px; }
+      .stat { font-size: 11px; gap: 3px; }
+      .stat .icon { font-size: 14px; }
+      .stat .label { font-size: 10px; }
+      .player-badge { font-size: 11px; gap: 3px; }
+      #sync-status { display: none; }
+
+      .main-area {
+        flex-direction: row;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .farm-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        padding: 4px;
+      }
+      .farm-grid {
+        width: auto;
+        padding: 2px;
+        gap: 2px;
+        max-width: unset;
+        grid-template-columns: repeat(10, 1fr);
+      }
+      .farm-slot {
+        aspect-ratio: 1;
+        border-radius: 4px;
+      }
+      .farm-slot:hover { transform: none; }
+
+      .barn-area {
+        width: 60px;
+        min-width: 60px;
+        border-left: 2px solid var(--panel-border);
+        border-top: none;
+      }
+      .barn-title { font-size: 9px; padding: 3px 2px; }
+      .barn-scene { display: none; }
+      .barn-area::after {
+        content: "🐄";
+        display: block;
+        text-align: center;
+        font-size: 22px;
+        padding: 4px 0;
+        opacity: 0.6;
+      }
+
+      .side-panel {
+        position: fixed;
+        top: 32px;
+        right: 0;
+        bottom: 0;
+        width: 260px;
+        max-width: 80vw;
+        z-index: 90;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        border-left: 2px solid var(--panel-border);
+        border-top: none;
+      }
+      .side-panel.open { transform: translateX(0); }
+
+      .seed-selector {
+        padding: 3px 8px;
+      }
+      .seed-selector-label { font-size: 10px; margin-bottom: 3px; }
+      .seed-card {
+        width: 48px;
+        padding: 3px 2px;
+        border-radius: 5px;
+      }
+      .seed-card .seed-emoji { font-size: 18px; }
+      .seed-card .seed-name { font-size: 8px; max-width: 44px; }
+      .seed-card .seed-qty { font-size: 9px; }
+
+      .action-bar {
+        padding: 4px 6px;
+        gap: 6px;
+        min-height: 40px;
+      }
+      .action-btn {
+        padding: 4px 6px;
+        font-size: 18px;
+        border-radius: 6px;
+      }
+
+      .panel-tab { padding: 5px; font-size: 11px; }
+      .panel-content { padding: 6px; }
+      .inv-item { padding: 5px; margin-bottom: 3px; }
+      .inv-item .item-icon { font-size: 18px; }
+      .inv-item .item-name { font-size: 11px; }
+      .shop-item { padding: 6px; margin-bottom: 3px; }
+      .shop-item .item-icon { font-size: 20px; }
+      .shop-item .item-name { font-size: 11px; }
+      .shop-item .buy-btn { padding: 3px 6px; font-size: 10px; }
+
+      .panel-toggle-btn { display: inline-block; }
+
+      .notifications { top: 36px; right: 8px; }
+      .notification { font-size: 11px; padding: 5px 8px; max-width: 220px; }
+
+      /* Login screen in landscape */
+      .login-box {
+        min-width: auto;
+        max-width: 320px;
+        padding: 20px;
+        border-radius: 12px;
+      }
+      .login-box h1 { font-size: 1.4em; }
+      .login-box .subtitle { font-size: 12px; margin-bottom: 14px; }
+      .tab-btn { padding: 6px; font-size: 12px; }
+      .form-group { margin-bottom: 8px; }
+      .form-group input { padding: 6px 10px; font-size: 14px; }
+      .login-btn { padding: 8px; font-size: 14px; }
     }
 
     /* --- Info Tooltip (for animals and plants) --- */
@@ -734,6 +880,7 @@
           <span>🧑‍🌾</span>
           <span class="name" id="player-name-display">Farmer</span>
         </div>
+        <button type="button" class="panel-toggle-btn" id="panel-toggle-btn" title="Open Warehouse / Shop">📦</button>
         <span style="font-size:12px;color:var(--text-dark);" id="sync-status">Ready</span>
         <div class="sync-indicator" id="sync-indicator"></div>
       </div>
@@ -769,7 +916,6 @@
 
     <!-- Seed Selector Bar -->
     <div class="seed-selector" id="seed-selector">
-      <span class="seed-selector-label">🌱 Seeds:</span>
       <div id="seed-buttons"></div>
     </div>
 
@@ -1230,6 +1376,10 @@
     }
 
     // ============================================================
+    // RESPONSIVE FARM GRID (JS-driven for landscape)
+    // ============================================================
+
+    // ============================================================
     // RENDERING
     // ============================================================
     function renderAll() {
@@ -1477,6 +1627,31 @@
       document.getElementById('warehouse-panel').classList.toggle('hidden', tab !== 'warehouse');
       document.getElementById('shop-panel').classList.toggle('hidden', tab !== 'shop');
     }
+
+    function toggleSidePanel() {
+      const panel = document.querySelector('.side-panel');
+      if (panel) panel.classList.toggle('open');
+    }
+
+    // Attach toggle handler directly to the button (more reliable than inline onclick)
+    const panelToggleBtn = document.getElementById('panel-toggle-btn');
+    if (panelToggleBtn) {
+      panelToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSidePanel();
+      });
+    }
+
+    // Close side panel when clicking outside on mobile landscape
+    document.addEventListener('click', (e) => {
+      const panel = document.querySelector('.side-panel');
+      const btn = document.getElementById('panel-toggle-btn');
+      if (panel && panel.classList.contains('open')) {
+        if (!panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+          panel.classList.remove('open');
+        }
+      }
+    });
 
     // ============================================================
     // WAL SYNC ENGINE
