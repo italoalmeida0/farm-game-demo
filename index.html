@@ -1721,6 +1721,25 @@
       </div>
     </div>
 
+    <!-- Google Username Modal -->
+    <div class="settings-overlay hidden" id="google-username-overlay" style="z-index: 1100;">
+      <div class="settings-box">
+        <div class="settings-header">
+          <div class="settings-title">🌾 Choose Your Farmer Name</div>
+        </div>
+        <div class="settings-body">
+          <p style="margin-bottom:12px;font-size:13px;color:var(--text-dark);">Welcome! Since this is your first time signing in with Google, please choose a username for your farm.</p>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label>Username</label>
+            <input type="text" id="google-username-input" placeholder="Your farmer name" maxlength="20" autocomplete="off">
+          </div>
+          <div class="login-error" id="google-username-error"></div>
+          <button class="login-btn" onclick="confirmGoogleUsername()">🌱 Create Farm!</button>
+          <button class="login-btn" style="background:var(--btn);margin-top:8px;" onclick="cancelGoogleUsername()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Game Screen -->
     <div id="game-screen">
       <!-- Top Bar -->
@@ -2602,6 +2621,8 @@
       }
 
       // --- Google Sign-In Handler ---
+      let pendingGoogleIdToken = null;
+
       async function handleGoogleCredentialResponse(response) {
         const idToken = response.credential;
 
@@ -2644,6 +2665,17 @@
             body: JSON.stringify({ idToken }),
           });
           const data = await res.json();
+          if (data.needsUsername) {
+            // First-time Google sign-in: ask for username
+            pendingGoogleIdToken = idToken;
+            const input = document.getElementById("google-username-input");
+            const errorDiv = document.getElementById("google-username-error");
+            if (input) input.value = data.suggestedUsername || "";
+            if (errorDiv) errorDiv.textContent = "";
+            document.getElementById("google-username-overlay").classList.remove("hidden");
+            if (input) input.focus();
+            return;
+          }
           if (!data.success) {
             if (errDiv)
               errDiv.textContent = data.error || "Google sign-in failed";
@@ -2658,10 +2690,54 @@
           if (errDiv) errDiv.textContent = "Cannot reach server. Try again.";
         }
       }
+
+      async function confirmGoogleUsername() {
+        const username = document.getElementById("google-username-input").value.trim();
+        const errDiv = document.getElementById("google-username-error");
+        if (!username || username.length < 2) {
+          errDiv.textContent = "Name must be at least 2 characters";
+          return;
+        }
+        if (!/^[a-zA-Z0-9_ ]+$/.test(username)) {
+          errDiv.textContent = "Only letters, numbers, spaces, underscores";
+          return;
+        }
+        errDiv.textContent = "";
+        try {
+          const res = await fetch(`${API_BASE}/api/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: pendingGoogleIdToken, username }),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            errDiv.textContent = data.error || "Failed to create account";
+            return;
+          }
+          pendingGoogleIdToken = null;
+          document.getElementById("google-username-overlay").classList.add("hidden");
+          updateGameMode(data.mode);
+          authToken = data.token;
+          gameState = data.state;
+          localStorage.setItem("farm_token", authToken);
+          enterGame();
+        } catch (e) {
+          errDiv.textContent = "Server error. Try again.";
+        }
+      }
+
+      function cancelGoogleUsername() {
+        pendingGoogleIdToken = null;
+        document.getElementById("google-username-overlay").classList.add("hidden");
+        document.getElementById("google-username-error").textContent = "";
+      }
+
       // Expose to global scope for Google callback
       window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
       window.toggleGoogleLink = toggleGoogleLink;
       window.unlinkGoogleAccount = unlinkGoogleAccount;
+      window.confirmGoogleUsername = confirmGoogleUsername;
+      window.cancelGoogleUsername = cancelGoogleUsername;
 
       async function verify2FALogin() {
         const code = document.getElementById("twofa-login-code").value.trim();

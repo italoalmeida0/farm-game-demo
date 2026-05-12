@@ -842,7 +842,7 @@ async function handleRequest(req) {
         const { data: body, error: bodyErr } = await parseJsonBody(req);
         if (bodyErr) return bodyErr;
 
-        const { idToken } = body;
+        const { idToken, username: requestedUsername } = body;
         if (!idToken || typeof idToken !== 'string') {
           return jsonResp({ success: false, error: 'ID token required' }, 400, origin);
         }
@@ -884,18 +884,22 @@ async function handleRequest(req) {
           }
         }
 
-        // If not found by googleId, create new account
+        // If not found by googleId, need to create new account
         if (!account) {
-          // Generate a username from email or a random one
-          let baseUsername = googleEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
-          if (!baseUsername || baseUsername.length < 2) {
-            baseUsername = 'farmer' + Math.random().toString(36).substr(2, 5);
+          // If no username provided, ask frontend for one
+          if (!requestedUsername || typeof requestedUsername !== 'string') {
+            return jsonResp({ success: false, needsUsername: true, suggestedUsername: googleEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() || 'farmer' }, 200, origin);
           }
-          let username = baseUsername;
-          let suffix = 1;
-          while (accounts.has(username)) {
-            username = baseUsername + suffix;
-            suffix++;
+
+          const trimmedUsername = requestedUsername.trim();
+          const nameValidation = validatePlayerName(trimmedUsername);
+          if (!nameValidation.valid) {
+            return jsonResp({ success: false, error: nameValidation.reason }, 400, origin);
+          }
+
+          const username = trimmedUsername.toLowerCase();
+          if (accounts.has(username)) {
+            return jsonResp({ success: false, error: 'Username already taken' }, 409, origin);
           }
 
           let playerId;
