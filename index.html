@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>🌾 Happy Harvest - Farm Game</title>
+  <title>Harvesting Happily - Farm Game</title>
+  <meta name="theme-color" content="#2d1b0e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Harvesting Happily">
+  <meta name="description" content="A relaxing farm simulation game. Plant crops, raise animals, and grow your farm!">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -43,6 +51,37 @@
       user-select: none;
     }
 
+    /* Custom scrollbar for desktop */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-light);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, var(--brown-light), var(--brown));
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, var(--gold), var(--brown-light));
+    }
+    ::-webkit-scrollbar-corner {
+      background: var(--bg-light);
+    }
+
+    /* Hide scrollbar on mobile/touch devices */
+    @media (hover: none) and (pointer: coarse) {
+      ::-webkit-scrollbar {
+        width: 0px;
+        height: 0px;
+      }
+      * {
+        scrollbar-width: none;
+      }
+    }
+
     /* --- Login Screen --- */
     #login-screen {
       position: fixed; inset: 0;
@@ -62,7 +101,7 @@
       max-width: 400px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
-    .login-box h1 { font-size: 2em; margin-bottom: 4px; }
+    .login-box h1 { font-size: x-large; margin-bottom: 4px; }
     .login-box .subtitle { color: var(--text-dark); margin-bottom: 24px; font-size: 14px; }
 
     .tab-buttons {
@@ -545,14 +584,14 @@
     .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .panel-toggle-btn {
-      display: none;
+      display: inline-block;
       padding: 4px 8px;
       background: var(--btn);
       color: var(--text);
       border: 2px solid var(--panel-border);
       border-radius: 6px;
       cursor: pointer;
-      font-size: 18px;
+      font-size: 12px;
       line-height: 1;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
@@ -658,15 +697,6 @@
         border-top: none;
       }
       .barn-title { font-size: 9px; padding: 3px 2px; }
-      .barn-scene { display: none; }
-      .barn-area::after {
-        content: "🐄";
-        display: block;
-        text-align: center;
-        font-size: 22px;
-        padding: 4px 0;
-        opacity: 0.6;
-      }
 
       .side-panel {
         position: fixed;
@@ -717,7 +747,11 @@
       .shop-item .item-name { font-size: 11px; }
       .shop-item .buy-btn { padding: 3px 6px; font-size: 10px; }
 
-      .panel-toggle-btn { display: inline-block; }
+      .action-bar #panel-toggle-btn {
+        padding: 4px 6px;
+        font-size: 18px;
+        border-radius: 6px;
+      }
 
       .notifications { top: 36px; right: 8px; }
       .notification { font-size: 11px; padding: 5px 8px; max-width: 220px; }
@@ -729,7 +763,6 @@
         padding: 20px;
         border-radius: 12px;
       }
-      .login-box h1 { font-size: 1.4em; }
       .login-box .subtitle { font-size: 12px; margin-bottom: 14px; }
       .tab-btn { padding: 6px; font-size: 12px; }
       .form-group { margin-bottom: 8px; }
@@ -792,6 +825,50 @@
     .info-tooltip .tip-btn.collect { background: var(--green); color: white; }
     .info-tooltip .tip-btn.collect:hover { background: var(--green-dark); }
 
+    /* --- Confirm Modal --- */
+    .confirm-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 600;
+      display: flex; align-items: center; justify-content: center;
+      animation: tooltipFadeIn 0.2s ease;
+    }
+    .confirm-overlay.hidden { display: none; }
+    .confirm-box {
+      background: var(--panel);
+      border: 3px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      text-align: center;
+      min-width: 280px;
+      max-width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .confirm-box .confirm-title {
+      font-size: 18px; font-weight: bold; color: var(--text);
+      margin-bottom: 8px;
+    }
+    .confirm-box .confirm-msg {
+      font-size: 14px; color: var(--text-dark);
+      margin-bottom: 20px;
+    }
+    .confirm-box .confirm-buttons {
+      display: flex; gap: 12px; justify-content: center;
+    }
+    .confirm-box .confirm-btn {
+      padding: 10px 20px;
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: bold;
+      cursor: pointer; transition: opacity 0.2s;
+    }
+    .confirm-box .confirm-btn.yes {
+      background: var(--red); color: white;
+    }
+    .confirm-box .confirm-btn.no {
+      background: var(--btn); color: var(--text);
+    }
+    .confirm-box .confirm-btn:hover { opacity: 0.85; }
+
     /* --- Disconnect Overlay --- */
     .disconnect-overlay {
       position: fixed; inset: 0;
@@ -823,13 +900,56 @@
       margin-top: 8px;
     }
     .disconnect-overlay .reconnect-btn:hover { background: var(--btn-hover); }
+
+    /* --- Update Banner --- */
+    .update-banner {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel);
+      border: 2px solid var(--green);
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 300;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      animation: tooltipFadeIn 0.3s ease;
+    }
+    .update-banner.hidden { display: none; }
+    .update-banner .update-text {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .update-banner .update-btn {
+      padding: 6px 14px;
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .update-banner .update-btn:hover { background: var(--green-dark); }
+    .update-banner .update-close {
+      background: none;
+      border: none;
+      color: var(--text-dark);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .update-banner .update-close:hover { color: var(--text); }
   </style>
 </head>
 <body>
   <!-- Login Screen -->
   <div id="login-screen">
     <div class="login-box">
-      <h1>🌾 Happy Harvest</h1>
+      <h1>🌾 Harvesting Happily</h1>
       <p class="subtitle">Plant, harvest, raise animals & build your farm!</p>
 
       <div class="tab-buttons">
@@ -870,7 +990,7 @@
       </div>
 
       <div class="login-footer">
-        Happy Harvest - Farm Game
+        Harvesting Happily - Farm Game
       </div>
     </div>
   </div>
@@ -903,13 +1023,14 @@
           <span class="label">Feed</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;">
+      <div style="display:flex;align-items:center;gap:10px;">
         <span id="dev-mode-badge" style="display:none;background:#e74c3c;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:bold;">⚡ DEV MODE</span>
         <div class="player-badge">
           <span>🧑‍🌾</span>
           <span class="name" id="player-name-display">Farmer</span>
         </div>
-        <button type="button" class="panel-toggle-btn" id="panel-toggle-btn" title="Open Warehouse / Shop">📦</button>
+        <button type="button" class="panel-toggle-btn" id="notif-btn" title="Enable push notifications" onclick="toggleNotifications()">🔕</button>
+        <button type="button" class="panel-toggle-btn" id="logout-btn" title="Logout" onclick="doLogout()">🚪</button>
         <span style="font-size:12px;color:var(--text-dark);" id="sync-status">Ready</span>
         <div class="sync-indicator" id="sync-indicator"></div>
       </div>
@@ -950,11 +1071,24 @@
 
     <!-- Action Bar -->
     <div class="action-bar">
+      <button type="button" class="panel-toggle-btn" id="panel-toggle-btn" title="Open Warehouse / Shop">📦</button>
       <button class="action-btn" data-tool="till" onclick="selectTool('till')">🪏</button>
       <button class="action-btn" data-tool="water" onclick="selectTool('water')">🚿</button>
       <button class="action-btn active" data-tool="hand" onclick="selectTool('hand')">✋</button>
       <button class="action-btn" data-tool="remove_pest" onclick="selectTool('remove_pest')">🐛</button>
       <button class="action-btn" data-tool="apply_pesticide" onclick="selectTool('apply_pesticide')">🧴</button>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="confirm-overlay hidden" id="confirm-overlay">
+    <div class="confirm-box">
+      <div class="confirm-title">🚪 Logout</div>
+      <div class="confirm-msg">Are you sure you want to logout?<br>Any unsaved progress will be synced first.</div>
+      <div class="confirm-buttons">
+        <button class="confirm-btn yes" onclick="confirmLogout()">Yes, logout</button>
+        <button class="confirm-btn no" onclick="cancelLogout()">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -969,6 +1103,13 @@
 
   <!-- Info Tooltip (dynamic, positioned by JS) -->
   <div class="info-tooltip hidden" id="info-tooltip"></div>
+
+  <!-- Update Banner -->
+  <div class="update-banner hidden" id="update-banner">
+    <span class="update-text">🌾 New version available!</span>
+    <button class="update-btn" onclick="applyUpdate()">Update Now</button>
+    <button class="update-close" onclick="dismissUpdate()">×</button>
+  </div>
 
   <!-- Notifications -->
   <div class="notifications" id="notifications"></div>
@@ -1271,9 +1412,12 @@
       }
     }
 
-    (async function tryReconnect() {
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 10;
+
+    async function tryReconnect() {
       const token = localStorage.getItem('farm_token');
-      if (!token) return;
+      if (!token) return false;
       try {
         const res = await fetch(`${API_BASE}/api/login`, {
           method: 'POST',
@@ -1287,11 +1431,120 @@
           updateGameMode(data.mode);
           localStorage.setItem('farm_token', authToken);
           enterGame();
+          reconnectAttempts = 0;
+          return true;
         } else {
+          // Token invalid/expired — clear it
           localStorage.removeItem('farm_token');
+          reconnectAttempts = 0;
+          return false;
         }
-      } catch (e) { /* server offline */ }
+      } catch (e) {
+        // Server offline or network error — keep token and retry later
+        return false;
+      }
+    }
+
+    // Initial reconnect attempt on page load
+    (async function initReconnect() {
+      const ok = await tryReconnect();
+      if (!ok && localStorage.getItem('farm_token')) {
+        scheduleReconnect();
+      }
     })();
+
+    function scheduleReconnect() {
+      if (reconnectTimer) return;
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+      reconnectAttempts++;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000); // exponential backoff, max 30s
+      reconnectTimer = setTimeout(async () => {
+        reconnectTimer = null;
+        const ok = await tryReconnect();
+        if (!ok && localStorage.getItem('farm_token')) {
+          scheduleReconnect();
+        }
+      }, delay);
+    }
+
+    // Also try reconnect when browser comes back online
+    window.addEventListener('online', () => {
+      if (localStorage.getItem('farm_token') && !authToken) {
+        reconnectAttempts = 0;
+        tryReconnect();
+      }
+    });
+
+    function doLogout() {
+      document.getElementById('confirm-overlay').classList.remove('hidden');
+    }
+
+    function cancelLogout() {
+      document.getElementById('confirm-overlay').classList.add('hidden');
+    }
+
+    async function confirmLogout() {
+      document.getElementById('confirm-overlay').classList.add('hidden');
+      const btn = document.getElementById('logout-btn');
+      if (btn) btn.disabled = true;
+
+      // Sync any pending actions before logout
+      if (authToken && walBuffer.length > 0) {
+        setSyncStatus('syncing');
+        try {
+          await syncWithServer();
+        } catch (e) {
+          // Continue logout even if sync fails
+        }
+      }
+
+      // Unsubscribe push notifications for this player
+      if (authToken) {
+        try {
+          await fetch(`${API_BASE}/api/push-unsubscribe`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          });
+        } catch (e) {
+          // Continue logout even if unsubscribe fails
+        }
+        try {
+          if (pushSubscription) {
+            await pushSubscription.unsubscribe();
+            pushSubscription = null;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Clear auth state
+      authToken = null;
+      gameState = null;
+      localStorage.removeItem('farm_token');
+
+      // Stop loops
+      if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+      if (renderTimer) { clearInterval(renderTimer); renderTimer = null; }
+      if (barnTimer) { clearInterval(barnTimer); barnTimer = null; }
+
+      // Reload page
+      window.location.reload();
+    }
+
+    function updateNotifBtnVisibility() {
+      const btn = document.getElementById('notif-btn');
+      if (!btn) return;
+      if (notificationsEnabled) {
+        btn.classList.add('active');
+        btn.title = 'Disable push notifications';
+        btn.textContent = '🔔';
+      } else {
+        btn.classList.remove('active');
+        btn.title = 'Enable push notifications';
+        btn.textContent = '🔕';
+      }
+    }
 
     function enterGame() {
       document.getElementById('login-screen').classList.add('hidden');
@@ -1301,6 +1554,7 @@
       if (globalThis.GAME_CONFIG.mode === 'dev') {
         document.getElementById('dev-mode-badge').style.display = 'inline';
       }
+      updateNotifBtnVisibility();
       buildFarmGrid();
       renderAll();
       startSyncLoop();
@@ -1528,21 +1782,24 @@
         return;
       }
       let html = '';
+      let totalSellValue = 0;
       for (const item of gameState.warehouse) {
         const def = WAREHOUSE_ITEMS[item.itemId];
         if (!def) continue;
+        const unitPrice = Math.max(1, Math.floor(def.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER));
+        totalSellValue += unitPrice * item.quantity;
         html += `<div class="inv-item">
           <span class="item-icon">${def.emoji}</span>
           <div class="item-info">
             <div class="item-name">${def.name}</div>
-            <div class="item-qty">x${item.quantity} • 🪙${Math.max(1, Math.floor(def.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))} each</div>
+            <div class="item-qty">x${item.quantity} • 🪙${unitPrice} each</div>
           </div>
           <div class="item-actions">
-            <button class="item-btn sell" onclick="sellItem('${item.itemId}')">Sell 🪙${Math.max(1, Math.floor(def.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))}</button>
+            <button class="item-btn sell" onclick="sellItem('${item.itemId}')">Sell 🪙${unitPrice}</button>
           </div>
         </div>`;
       }
-      html += `<button class="sell-all-btn" onclick="sellAll()">💰 Sell Everything</button>`;
+      html += `<button class="sell-all-btn" onclick="sellAll()">💰 Sell Everything — 🪙${totalSellValue}</button>`;
       panel.innerHTML = html;
     }
 
@@ -1690,7 +1947,9 @@
       const panel = document.querySelector('.side-panel');
       const btn = document.getElementById('panel-toggle-btn');
       if (panel && panel.classList.contains('open')) {
-        if (!panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+        const clickedInsidePanel = e.composedPath().includes(panel);
+        const clickedBtn = e.target === btn || btn.contains(e.target);
+        if (!clickedInsidePanel && !clickedBtn) {
           panel.classList.remove('open');
         }
       }
@@ -1703,12 +1962,60 @@
       syncTimer = setInterval(syncWithServer, globalThis.GAME_CONFIG.SYNC_INTERVAL_MS);
     }
 
+    // Track previous state for push notifications
+    let prevNotifState = null;
+
     function startRenderLoop() {
       renderTimer = setInterval(() => {
         applyGrowthTicks(gameState, Date.now(), false);
         renderFarm();
         renderStats();
+        checkPushNotifications();
       }, 500);
+    }
+
+    function checkPushNotifications() {
+      if (!gameState || !gameState.farm) return;
+
+      const now = Date.now();
+      const current = {
+        readySlots: 0,
+        drySlots: 0,
+        pestSlots: 0,
+        animalProducts: 0,
+      };
+
+      for (const slot of gameState.farm) {
+        if (!slot.unlocked) continue;
+        if (slot.state === 'ready') current.readySlots++;
+        if (slot.state === 'planted' && slot.isDry) current.drySlots++;
+        if (slot.state === 'planted' && slot.hasPests && !slot.pesticideUntil) current.pestSlots++;
+      }
+
+      for (const animal of Object.values(gameState.animals || {})) {
+        if (animal && animal.productReady) current.animalProducts++;
+      }
+
+      if (!prevNotifState) {
+        prevNotifState = current;
+        return;
+      }
+
+      // Notify when state changes from 0 to >0
+      if (current.readySlots > 0 && prevNotifState.readySlots === 0) {
+        pushNotify('🌾 Harvesting Happily', `${current.readySlots} crop${current.readySlots > 1 ? 's' : ''} ready to harvest!`, 'ready');
+      }
+      if (current.drySlots > 0 && prevNotifState.drySlots === 0) {
+        pushNotify('🌾 Harvesting Happily', `${current.drySlots} plot${current.drySlots > 1 ? 's' : ''} need water!`, 'dry');
+      }
+      if (current.pestSlots > 0 && prevNotifState.pestSlots === 0) {
+        pushNotify('🌾 Harvesting Happily', `Pests appeared on ${current.pestSlots} plot${current.pestSlots > 1 ? 's' : ''}!`, 'pest');
+      }
+      if (current.animalProducts > 0 && prevNotifState.animalProducts === 0) {
+        pushNotify('🌾 Harvesting Happily', `${current.animalProducts} animal product${current.animalProducts > 1 ? 's' : ''} ready to collect!`, 'animal');
+      }
+
+      prevNotifState = current;
     }
 
     function startBarnLoop() {
@@ -1746,6 +2053,146 @@
       container.appendChild(el);
       setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
     }
+
+    // --- Push notifications via Service Worker ---
+    const notificationCooldowns = {};
+    const NOTIFICATION_COOLDOWN_MS = 60 * 60_000; // 1 hour between same notification type
+
+    async function requestNotificationPermission() {
+      if (!('Notification' in window)) return false;
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      const result = await Notification.requestPermission();
+      return result === 'granted';
+    }
+
+    function canNotify(tag) {
+      const now = Date.now();
+      if (!notificationCooldowns[tag] || now - notificationCooldowns[tag] > NOTIFICATION_COOLDOWN_MS) {
+        notificationCooldowns[tag] = now;
+        return true;
+      }
+      return false;
+    }
+
+    async function pushNotify(title, body, tag) {
+      if (!notificationsEnabled) return;
+      if (document.visibilityState === 'visible') return; // Only when tab is hidden
+      if (!await requestNotificationPermission()) return;
+      if (!canNotify(tag)) return;
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          payload: { title, body, tag },
+        });
+      }
+    }
+
+    let notificationsEnabled = false;
+    let pushSubscription = null;
+
+    async function getVapidPublicKey() {
+      try {
+        const res = await fetch(`${API_BASE}/api/vapid-public-key`);
+        const data = await res.json();
+        return data.publicKey;
+      } catch { return null; }
+    }
+
+    async function subscribePush() {
+      if (!('serviceWorker' in navigator)) return false;
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.pushManager) return false;
+      const vapidKey = await getVapidPublicKey();
+      if (!vapidKey) return false;
+      try {
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+        pushSubscription = sub;
+        await fetch(`${API_BASE}/api/push-subscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken || 'offline'}`,
+          },
+          body: JSON.stringify({ subscription: sub.toJSON() }),
+        });
+        return true;
+      } catch (err) {
+        console.error('Push subscribe failed:', err);
+        return false;
+      }
+    }
+
+    async function unsubscribePush() {
+      if (!pushSubscription) return;
+      try {
+        await pushSubscription.unsubscribe();
+        await fetch(`${API_BASE}/api/push-unsubscribe`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken || 'offline'}` },
+        });
+      } catch { /* ignore */ }
+      pushSubscription = null;
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    async function toggleNotifications() {
+      const enabled = !notificationsEnabled;
+      notificationsEnabled = enabled;
+      localStorage.setItem('farm_notifications', enabled ? '1' : '0');
+      updateNotifBtnVisibility();
+      if (enabled) {
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          notificationsEnabled = false;
+          localStorage.setItem('farm_notifications', '0');
+          updateNotifBtnVisibility();
+          notify('Notification permission denied', 'error');
+          return;
+        }
+        const subscribed = await subscribePush();
+        if (!subscribed) {
+          notify('Push subscription failed', 'error');
+        } else {
+          notify('Push notifications enabled! 🔔', 'success');
+        }
+      } else {
+        await unsubscribePush();
+        notify('Push notifications disabled! 🔕', 'success');
+      }
+    }
+
+    // Restore notification preference
+    (async function restoreNotifPref() {
+      const saved = localStorage.getItem('farm_notifications');
+      if (saved === '1') {
+        notificationsEnabled = true;
+        // Re-subscribe push if needed
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          const existing = await reg.pushManager.getSubscription();
+          if (!existing) {
+            await subscribePush();
+          } else {
+            pushSubscription = existing;
+          }
+        }
+      }
+      updateNotifBtnVisibility();
+    })();
 
     function spawnParticle(slotIndex, actionType) {
       const slots = document.querySelectorAll('.farm-slot');
@@ -2133,8 +2580,64 @@
       switchTab, selectTool, selectCrop,
       buyItem, buyAnimal, feedAnimal, collectAnimal,
       sellItem, sellAll,
-      manualReconnect,
+      manualReconnect, toggleNotifications,
+      doLogout, confirmLogout, cancelLogout,
+      updateNotifBtnVisibility,
+      applyUpdate, dismissUpdate,
     });
+
+    // ============================================================
+    // SERVICE WORKER & UPDATE HANDLING
+    // ============================================================
+    let waitingWorker = null;
+
+    function showUpdateBanner() {
+      const banner = document.getElementById('update-banner');
+      if (banner) banner.classList.remove('hidden');
+    }
+
+    function dismissUpdate() {
+      const banner = document.getElementById('update-banner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    function applyUpdate() {
+      if (waitingWorker) {
+        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      }
+      window.location.reload();
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          // Check if there's a waiting worker (new version)
+          if (reg.waiting) {
+            waitingWorker = reg.waiting;
+            showUpdateBanner();
+          }
+
+          // When a new worker is installed and waiting
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version is installed but waiting
+                waitingWorker = newWorker;
+                showUpdateBanner();
+              }
+            });
+          });
+        }).catch(() => {});
+      });
+
+      // Also listen for controller change (new SW took over in another tab)
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
   </script>
 </body>
 </html>

@@ -1,0 +1,26 @@
+{
+  "name": "Harvesting Happily - Farm Game",
+  "short_name": "Harvesting Happily",
+  "description": "A relaxing farm simulation game. Plant crops, raise animals, and grow your farm!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2d1b0e",
+  "theme_color": "#2d1b0e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "lang": "en"
+}

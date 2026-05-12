@@ -1,4 +1,4 @@
-# 🌾 Happy Harvest — Farm Game
+# 🌾 Harvesting Happily — Farm Game
 
 An idle/progressive farm game running 100% in the browser, powered by a **Bun** backend with JSON file persistence. Plant, care, harvest, raise animals, and sell products to level up and unlock new items.
 

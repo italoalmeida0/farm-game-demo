@@ -3,11 +3,10 @@
 // New Architecture - Seed packs, Animals, Warehouse, Tools
 // ============================================================
 
-import { existsSync, mkdirSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { validateAndApplyWAL, createDefaultPlayerState, validatePlayerName, applyGrowthTicks } from './shared/validation';
 import { SEEDS, ANIMALS, WAREHOUSE_ITEMS, FEED_COST, TOOLS, XP_PER_LEVEL, GAME_MODE } from './shared/gameData';
-
 
 // ============================================================
 // CONFIGURATION
@@ -24,9 +23,101 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const DATA_DIR = join(import.meta.dir, 'data');
 const PLAYERS_DIR = join(DATA_DIR, 'players');
 const ACCOUNTS_FILE = join(DATA_DIR, 'accounts.json');
+const SESSIONS_FILE = join(DATA_DIR, 'sessions.json');
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 if (!existsSync(PLAYERS_DIR)) mkdirSync(PLAYERS_DIR, { recursive: true });
+
+// --- Web Push Setup ---
+let webpush;
+try {
+  webpush = await import('web-push');
+} catch { /* web-push not available */ }
+
+// Fallback generic keys (only used if .env is not configured)
+const DEFAULT_VAPID_PUBLIC = 'BHYVLRZAL6hRofwaL0VktVdEBw9PyGTJTAv7NkkrMvJOIGJHiv2SKs7i1M8sjZ8XIp0gy4PRpD39Xr0ze-eqAXQ';  //CHANGE THIS TO YOUR OWN PRIVATE KEY FOR PRODUCTION ON .env (generate with: npx web-push generate-vapid-keys)
+const DEFAULT_VAPID_PRIVATE = 'fZe-Ozcimd5hatpURnly2T1NH4bHj_qQxcLpvecaGYI'; //CHANGE THIS TO YOUR OWN PRIVATE KEY FOR PRODUCTION ON .env (generate with: npx web-push generate-vapid-keys)
+
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:test@blackhole.postmarkapp.com';
+
+if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.default.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
+
+const PUSH_SUBS_FILE = join(DATA_DIR, 'push-subs.json');
+const pushSubscriptions = new Map(); // playerId -> subscription
+
+function loadPushSubs() {
+  try {
+    if (existsSync(PUSH_SUBS_FILE)) {
+      const data = JSON.parse(readFileSync(PUSH_SUBS_FILE, 'utf8'));
+      for (const [k, v] of Object.entries(data)) pushSubscriptions.set(k, v);
+    }
+  } catch (e) { console.error('[PUSH] Failed to load subs:', e.message); }
+}
+
+function savePushSubs() {
+  try {
+    const obj = {};
+    for (const [k, v] of pushSubscriptions) obj[k] = v;
+    writeFileSync(PUSH_SUBS_FILE, JSON.stringify(obj));
+  } catch (e) { console.error('[PUSH] Failed to save subs:', e.message); }
+}
+
+// --- Session persistence ---
+function loadSessions() {
+  try {
+    if (existsSync(SESSIONS_FILE)) {
+      const raw = readFileSync(SESSIONS_FILE, 'utf8');
+      const data = JSON.parse(raw);
+      let loaded = 0;
+      const now = Date.now();
+      for (const [token, session] of Object.entries(data)) {
+        if (typeof session === 'object' && session !== null && session.playerId) {
+          if (now < session.expiresAt) {
+            sessions.set(token, session);
+            loaded++;
+          }
+        }
+      }
+      console.log('[BOOT] Restored ' + loaded + ' sessions');
+    }
+  } catch (e) { console.error('[BOOT] Failed to load sessions:', e.message); }
+}
+
+function saveSessions() {
+  try {
+    const obj = {};
+    for (const [key, val] of sessions) {
+      obj[key] = val;
+    }
+    writeFileSync(SESSIONS_FILE, JSON.stringify(obj));
+  } catch (e) { console.error('[SESSION] Failed to save sessions:', e.message); }
+}
+
+let sessionSaveTimer = null;
+function debouncedSaveSessions() {
+  if (sessionSaveTimer) clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(() => saveSessions(), 500);
+}
+
+async function sendPush(playerId, title, body, tag = 'default') {
+  if (!webpush) return;
+  const sub = pushSubscriptions.get(playerId);
+  if (!sub) return;
+  try {
+    await webpush.default.sendNotification(sub, JSON.stringify({ title, body, tag }));
+  } catch (err) {
+    if (err.statusCode === 410 || err.statusCode === 404) {
+      pushSubscriptions.delete(playerId);
+      savePushSubs();
+    } else {
+      console.error('[PUSH] Send failed:', err.message);
+    }
+  }
+}
 
 async function savePlayer(playerId, state) {
   const filePath = join(PLAYERS_DIR, playerId + '.json');
@@ -47,6 +138,10 @@ async function saveAccounts() {
   } catch (err) {
     console.error('[PERSIST] Failed to save accounts:', err.message);
   }
+}
+
+async function saveSessionsAsync() {
+  saveSessions();
 }
 
 async function bootRestore() {
@@ -106,7 +201,9 @@ const REG_RATE_LIMIT_WINDOW = 10 * 60 * 1000;
 const REG_RATE_LIMIT_MAX = 3;
 
 const LOCK_TTL_MS = 10_000;
-const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days absolute hard limit
+const SESSION_INACTIVITY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days of inactivity
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_BODY_AUTH = 1024;
 const MAX_BODY_SYNC = 65536;
@@ -119,12 +216,15 @@ setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
   for (const [token, session] of sessions) {
-    if (now - session.createdAt > SESSION_EXPIRY_MS) {
+    if (now > session.expiresAt || now - session.lastUsedAt > SESSION_INACTIVITY_MS) {
       sessions.delete(token);
       cleaned++;
     }
   }
-  if (cleaned > 0) console.log(`[CLEANUP] Removed ${cleaned} expired sessions`);
+  if (cleaned > 0) {
+    console.log(`[CLEANUP] Removed ${cleaned} expired sessions`);
+    saveSessions();
+  }
 }, 5 * 60 * 1000);
 
 setInterval(() => {
@@ -298,8 +398,17 @@ function getPlayerFromAuth(authHeader) {
 
   const session = sessions.get(token);
   if (!session) return null;
-  if (Date.now() - session.createdAt > SESSION_EXPIRY_MS) {
+  const now = Date.now();
+  if (now > session.expiresAt || now - session.lastUsedAt > SESSION_INACTIVITY_MS) {
     sessions.delete(token);
+    debouncedSaveSessions();
+    return null;
+  }
+  // Extend session on activity
+  session.lastUsedAt = now;
+  if (now - session.createdAt > SESSION_MAX_AGE_MS) {
+    sessions.delete(token);
+    debouncedSaveSessions();
     return null;
   }
   const state = players.get(session.playerId);
@@ -517,7 +626,8 @@ async function handleRequest(req) {
         accounts.set(trimmed, { username: trimmed, passwordHash, playerId });
 
         const token = generateSessionToken();
-        sessions.set(token, { playerId, createdAt: Date.now() });
+        sessions.set(token, { playerId, createdAt: now, lastUsedAt: now, expiresAt: now + SESSION_EXPIRY_MS });
+        debouncedSaveSessions();
 
         await Promise.all([savePlayer(playerId, state), saveAccounts()]);
 
@@ -541,11 +651,22 @@ async function handleRequest(req) {
         if (token) {
           if (typeof token !== 'string') return jsonResp({ success: false, error: 'Invalid token format' }, 400, origin);
           const session = sessions.get(token);
+          const now = Date.now();
           if (!session) return jsonResp({ success: false, error: 'Invalid or expired session' }, 401, origin);
-          if (Date.now() - session.createdAt > SESSION_EXPIRY_MS) {
+          if (now > session.expiresAt || now - session.lastUsedAt > SESSION_INACTIVITY_MS) {
             sessions.delete(token);
+            debouncedSaveSessions();
             return jsonResp({ success: false, error: 'Session expired' }, 401, origin);
           }
+          if (now - session.createdAt > SESSION_MAX_AGE_MS) {
+            sessions.delete(token);
+            debouncedSaveSessions();
+            return jsonResp({ success: false, error: 'Session expired' }, 401, origin);
+          }
+          // Extend on reconnect
+          session.lastUsedAt = now;
+          session.expiresAt = now + SESSION_EXPIRY_MS;
+          debouncedSaveSessions();
           const state = players.get(session.playerId);
           if (!state) return jsonResp({ success: false, error: 'Player not found' }, 401, origin);
           applyGrowthTicks(state, Date.now(), true);
@@ -584,8 +705,10 @@ async function handleRequest(req) {
         const state = players.get(account.playerId);
         applyGrowthTicks(state, Date.now(), true);
 
+        const now = Date.now();
         const newToken = generateSessionToken();
-        sessions.set(newToken, { playerId: account.playerId, createdAt: Date.now() });
+        sessions.set(newToken, { playerId: account.playerId, createdAt: now, lastUsedAt: now, expiresAt: now + SESSION_EXPIRY_MS });
+        debouncedSaveSessions();
 
         return jsonResp({ success: true, state, token: newToken, mode: GAME_MODE }, 200, origin);
       }
@@ -644,6 +767,42 @@ async function handleRequest(req) {
         }
       }
 
+      // --- Push Subscription ---
+      if (path === '/api/push-subscribe') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, 4096, origin);
+        if (clErr) return clErr;
+
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        try {
+          const body = await req.json();
+          if (!body.subscription || !body.subscription.endpoint) {
+            return jsonResp({ success: false, error: 'Invalid subscription' }, 400, origin);
+          }
+          pushSubscriptions.set(state.playerId, body.subscription);
+          savePushSubs();
+          return jsonResp({ success: true }, 200, origin);
+        } catch {
+          return jsonResp({ success: false, error: 'Invalid JSON' }, 400, origin);
+        }
+      }
+
+      if (path === '/api/push-unsubscribe') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+        pushSubscriptions.delete(state.playerId);
+        savePushSubs();
+        return jsonResp({ success: true }, 200, origin);
+      }
+
+      if (path === '/api/vapid-public-key') {
+        return jsonResp({ publicKey: VAPID_PUBLIC_KEY }, 200, origin);
+      }
 
       return jsonResp({ error: 'Not found' }, 404, origin);
     }
@@ -652,6 +811,22 @@ async function handleRequest(req) {
     if (path === '/' || path === '/index.html') {
       const file = Bun.file('./index.html');
       return new Response(file, { headers: { 'Content-Type': 'text/html' } });
+    }
+
+    // PWA assets
+    const pwaFiles = {
+      '/manifest.json': { file: './manifest.json', type: 'application/json' },
+      '/sw.js': { file: './sw.js', type: 'application/javascript' },
+      '/icon.png': { file: './icon.png', type: 'image/png' },
+      '/icon-192.png': { file: './icon-192.png', type: 'image/png' },
+      '/icon-512.png': { file: './icon-512.png', type: 'image/png' },
+    };
+    if (pwaFiles[path]) {
+      const asset = pwaFiles[path];
+      const file = Bun.file(asset.file);
+      if (await file.exists()) {
+        return new Response(file, { headers: { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=86400' } });
+      }
     }
 
     // Serve shared modules as JS assets (for frontend ES module imports)
@@ -673,20 +848,100 @@ async function handleRequest(req) {
 }
 
 // ============================================================
+// BACKGROUND PUSH NOTIFICATIONS
+// ============================================================
+
+const pushCooldowns = new Map(); // playerId -> { tag: timestamp }
+const PUSH_COOLDOWN_MS = 60 * 60_000; // 1 hour between same notification type
+
+async function loadAllPlayerStates() {
+  const states = [];
+  try {
+    const files = readdirSync(PLAYERS_DIR).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      const playerId = file.replace('.json', '');
+      const data = JSON.parse(readFileSync(join(PLAYERS_DIR, file), 'utf8'));
+      states.push({ playerId, state: data });
+    }
+  } catch (e) { /* ignore */ }
+  return states;
+}
+
+async function checkAndSendPushNotifications() {
+  if (!webpush) return;
+  const players = await loadAllPlayerStates();
+  const now = Date.now();
+
+  for (const { playerId, state } of players) {
+    if (!pushSubscriptions.has(playerId)) continue;
+
+    const cooldowns = pushCooldowns.get(playerId) || {};
+
+    // Apply growth ticks to get current state
+    applyGrowthTicks(state, now, false);
+
+    let readySlots = 0;
+    let drySlots = 0;
+    let pestSlots = 0;
+    let animalProducts = 0;
+
+    for (const slot of state.farm || []) {
+      if (!slot.unlocked) continue;
+      if (slot.state === 'ready') readySlots++;
+      if (slot.state === 'planted' && slot.isDry) drySlots++;
+      if (slot.state === 'planted' && slot.hasPests && !slot.pesticideUntil) pestSlots++;
+    }
+
+    for (const animal of Object.values(state.animals || {})) {
+      if (animal && animal.productReady) animalProducts++;
+    }
+
+    const sendIfCooled = async (tag, title, body) => {
+      const last = cooldowns[tag] || 0;
+      if (now - last > PUSH_COOLDOWN_MS) {
+        cooldowns[tag] = now;
+        pushCooldowns.set(playerId, cooldowns);
+        await sendPush(playerId, title, body, tag);
+      }
+    };
+
+    if (readySlots > 0) {
+      await sendIfCooled('ready', '🌾 Harvesting Happily', `${readySlots} crop${readySlots > 1 ? 's' : ''} ready to harvest!`);
+    }
+    if (drySlots > 0) {
+      await sendIfCooled('dry', '🌾 Harvesting Happily', `${drySlots} plot${drySlots > 1 ? 's' : ''} need water!`);
+    }
+    if (pestSlots > 0) {
+      await sendIfCooled('pest', '🌾 Harvesting Happily', `Pests appeared on ${pestSlots} plot${pestSlots > 1 ? 's' : ''}!`);
+    }
+    if (animalProducts > 0) {
+      await sendIfCooled('animal', '🌾 Harvesting Happily', `${animalProducts} animal product${animalProducts > 1 ? 's' : ''} ready to collect!`);
+    }
+  }
+}
+
+// Run push checks every 2 minutes
+setInterval(checkAndSendPushNotifications, 2 * 60_000);
+
+// ============================================================
 // BOOT & START
 // ============================================================
 
+loadPushSubs();
+loadSessions();
 await bootRestore();
 
 const port = 3456;
-console.log(`🌾 Farm Game Server running on http://localhost:${port}`);
+console.log(`🌾 Harvesting Happily - Farm Game Server running on http://localhost:${port}`);
 console.log(`   ⚙️  Mode:      ${globalThis.GAME_CONFIG.mode.toUpperCase()} ${globalThis.GAME_CONFIG.mode === 'dev' ? '(fast demo: accelerated timers, 5k coins, high pest chance)' : '(production timings)'}`);
 console.log(`   🎮 Game:       http://localhost:${port}/`);
 console.log(`   ❤️  Health:     http://localhost:${port}/api/health`);
 console.log(`   💾 Persistence: write-through per player (${PLAYERS_DIR})`);
 console.log(`   🔒 Security:   PBKDF2 hashing, brute-force lockout, lock TTL, awaited persistence`);
-console.log(`   🛡️  Hardened:   path traversal blocked, method enforcement, body validation, rate limiting`);
+console.log(`   🔑 Sessions:   persistent, sliding window, 30d expiry, 7d inactivity`);
+console.log(`   �️  Hardened:   path traversal blocked, method enforcement, body validation, rate limiting`);
 console.log(`   🌐 Proxy trust: ${TRUST_PROXY}, CORS: ${ALLOWED_ORIGINS.join(',')}`);
+console.log(`   🔔 Push:       ${webpush ? 'enabled' : 'disabled'} (${pushSubscriptions.size} subscribers)`);
 
 export default {
   port,
