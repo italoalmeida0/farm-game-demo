@@ -155,7 +155,7 @@ export function applyGrowthTicks(state, now, isServer = false) {
       // Can only grow if NOT dry
       if (!slot.isDry) {
         const timeSincePlant = now - slot.plantedAt;
-        slot.growthProgress = Math.min(1.0, timeSincePlant / (crop.growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER));
+        slot.growthProgress = Math.min(1.0, timeSincePlant / Math.floor(crop.growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER));
 
         if (slot.growthProgress >= 1.0) {
           slot.state = "ready";
@@ -200,7 +200,7 @@ export function applyGrowthTicks(state, now, isServer = false) {
     if (!animal) continue;
 
     // Check if baby became adult
-    if (!animal.isAdult && now >= animal.boughtAt + (ANIMALS[animalId].growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER)) {
+    if (!animal.isAdult && now >= animal.boughtAt + Math.floor(ANIMALS[animalId].growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER)) {
       animal.isAdult = true;
     }
 
@@ -208,7 +208,7 @@ export function applyGrowthTicks(state, now, isServer = false) {
     if (
       animal.isProducing &&
       animal.producingAt !== null &&
-      now >= animal.producingAt + (ANIMALS[animalId].productionTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER)
+      now >= animal.producingAt + Math.floor(ANIMALS[animalId].productionTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER)
     ) {
       animal.productReady = true;
       animal.isProducing = false;
@@ -432,7 +432,7 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
 
       if (action.itemId === "feed") {
         // Buy animal feed
-        const totalCost = (FEED_COST * globalThis.GAME_CONFIG.BUY_MULTIPLIER) * action.quantity;
+        const totalCost = Math.floor(FEED_COST * globalThis.GAME_CONFIG.BUY_MULTIPLIER) * action.quantity;
         if (state.coins < totalCost)
           return { valid: false, reason: "Not enough coins" };
         state.coins -= totalCost;
@@ -446,7 +446,7 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
       if (getLevel(state) < seed.requiredLevel)
         return { valid: false, reason: `Level ${seed.requiredLevel} required` };
 
-      const totalCost = (seed.packCost * globalThis.GAME_CONFIG.BUY_MULTIPLIER) * action.quantity;
+      const totalCost = Math.floor(seed.packCost * globalThis.GAME_CONFIG.BUY_MULTIPLIER) * action.quantity;
       if (state.coins < totalCost)
         return { valid: false, reason: "Not enough coins" };
 
@@ -462,7 +462,7 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
       if (slot.unlocked)
         return { valid: false, reason: "Slot already unlocked" };
 
-      const cost = getSlotUnlockCost(state.unlockedSlots) * globalThis.GAME_CONFIG.BUY_MULTIPLIER;
+      const cost = Math.floor(getSlotUnlockCost(state.unlockedSlots) * globalThis.GAME_CONFIG.BUY_MULTIPLIER);
       if (state.coins < cost)
         return { valid: false, reason: `Not enough coins (need ${cost})` };
 
@@ -483,10 +483,10 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
         };
       if (state.animals[action.animalId] !== null)
         return { valid: false, reason: "Already have this animal" };
-      if (state.coins < (animalDef.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))
+      if (state.coins < Math.floor(animalDef.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))
         return { valid: false, reason: "Not enough coins" };
 
-      state.coins -= (animalDef.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER);
+      state.coins -= Math.floor(animalDef.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER);
       state.animals[action.animalId] = {
         type: action.animalId,
         boughtAt: serverNow,
@@ -552,7 +552,7 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
         return { valid: false, reason: "Not enough items in warehouse" };
 
       removeWarehouseItem(state, action.itemId, action.quantity);
-      state.coins += (itemDef.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER) * action.quantity;
+      state.coins += Math.floor(itemDef.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER) * action.quantity;
       return { valid: true };
     }
 
@@ -561,7 +561,7 @@ export function validateAndApplyAction(state, action, serverNow, _clientTimestam
       for (const item of state.warehouse) {
         const def = WAREHOUSE_ITEMS[item.itemId];
         if (def && def.sellPrice > 0) {
-          totalGold += (def.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER) * item.quantity;
+          totalGold += Math.floor(def.sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER) * item.quantity;
         }
       }
       if (totalGold === 0) return { valid: false, reason: "Nothing to sell" };
