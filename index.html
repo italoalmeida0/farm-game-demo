@@ -1695,24 +1695,6 @@
         >
           <div id="google-signin-container">
             <div
-              id="g_id_onload"
-              data-context="signin"
-              data-ux_mode="popup"
-              data-callback="handleGoogleCredentialResponse"
-              data-auto_prompt="false"
-            ></div>
-            <div
-              id="g_id_signin_btn"
-              class="g_id_signin"
-              data-type="standard"
-              data-shape="rectangular"
-              data-theme="outline"
-              data-text="signin_with"
-              data-size="large"
-              data-logo_alignment="center"
-              data-width="300"
-            ></div>
-            <div
               class="login-error"
               id="google-config-error"
               style="margin-top: 8px; display: none"
@@ -2438,27 +2420,47 @@
             const data = await res.json();
             serverGoogleClientId = data.googleClientId || "";
             serverVapidPublicKey = data.vapidPublicKey || "";
-            // Update Google sign-in button if client ID is available
-            if (serverGoogleClientId && window.google && window.google.accounts) {
-              const onloadDiv = document.getElementById("g_id_onload");
-              if (onloadDiv) {
-                onloadDiv.setAttribute("data-client_id", serverGoogleClientId);
-                window.google.accounts.id.initialize({
-                  client_id: serverGoogleClientId,
-                  callback: handleGoogleCredentialResponse,
-                  auto_select: false,
-                });
-              }
+            const container = document.getElementById("google-signin-container");
+            const errDiv = document.getElementById("google-config-error");
+            // Create Google sign-in button if client ID is available
+            if (serverGoogleClientId && window.google && window.google.accounts && container) {
+              if (errDiv) errDiv.style.display = "none";
+              // Create g_id_onload div
+              const onloadDiv = document.createElement("div");
+              onloadDiv.id = "g_id_onload";
+              onloadDiv.setAttribute("data-client_id", serverGoogleClientId);
+              onloadDiv.setAttribute("data-context", "signin");
+              onloadDiv.setAttribute("data-ux_mode", "popup");
+              onloadDiv.setAttribute("data-callback", "handleGoogleCredentialResponse");
+              onloadDiv.setAttribute("data-auto_prompt", "false");
+              container.appendChild(onloadDiv);
+              // Create sign-in button div
+              const btnDiv = document.createElement("div");
+              btnDiv.id = "g_id_signin_btn";
+              btnDiv.className = "g_id_signin";
+              btnDiv.setAttribute("data-type", "standard");
+              btnDiv.setAttribute("data-shape", "rectangular");
+              btnDiv.setAttribute("data-theme", "outline");
+              btnDiv.setAttribute("data-text", "signin_with");
+              btnDiv.setAttribute("data-size", "large");
+              btnDiv.setAttribute("data-logo_alignment", "center");
+              btnDiv.setAttribute("data-width", "300");
+              container.appendChild(btnDiv);
+              // Initialize Google Identity Services
+              window.google.accounts.id.initialize({
+                client_id: serverGoogleClientId,
+                callback: handleGoogleCredentialResponse,
+                auto_select: false,
+              });
             } else {
-              // Hide Google button, show config error
-              const btnDiv = document.getElementById("g_id_signin_btn");
-              const errDiv = document.getElementById("google-config-error");
-              if (btnDiv) btnDiv.style.display = "none";
+              // Show config error
               if (errDiv) errDiv.style.display = "";
             }
           }
         } catch (e) {
           // Server might be older version without /api/config
+          const errDiv = document.getElementById("google-config-error");
+          if (errDiv) errDiv.style.display = "";
         }
       }
 
