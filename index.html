@@ -8,7 +8,7 @@
     />
     <title>Harvesting Happily - Farm Game</title>
     <meta name="theme-color" content="#2d1b0e" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
@@ -2425,32 +2425,25 @@
             // Create Google sign-in button if client ID is available
             if (serverGoogleClientId && window.google && window.google.accounts && container) {
               if (errDiv) errDiv.style.display = "none";
-              // Create g_id_onload div
-              const onloadDiv = document.createElement("div");
-              onloadDiv.id = "g_id_onload";
-              onloadDiv.setAttribute("data-client_id", serverGoogleClientId);
-              onloadDiv.setAttribute("data-context", "signin");
-              onloadDiv.setAttribute("data-ux_mode", "popup");
-              onloadDiv.setAttribute("data-callback", "handleGoogleCredentialResponse");
-              onloadDiv.setAttribute("data-auto_prompt", "false");
-              container.appendChild(onloadDiv);
-              // Create sign-in button div
-              const btnDiv = document.createElement("div");
-              btnDiv.id = "g_id_signin_btn";
-              btnDiv.className = "g_id_signin";
-              btnDiv.setAttribute("data-type", "standard");
-              btnDiv.setAttribute("data-shape", "rectangular");
-              btnDiv.setAttribute("data-theme", "outline");
-              btnDiv.setAttribute("data-text", "signin_with");
-              btnDiv.setAttribute("data-size", "large");
-              btnDiv.setAttribute("data-logo_alignment", "center");
-              btnDiv.setAttribute("data-width", "300");
-              container.appendChild(btnDiv);
-              // Initialize Google Identity Services
+              // Initialize Google Identity Services first
               window.google.accounts.id.initialize({
                 client_id: serverGoogleClientId,
                 callback: handleGoogleCredentialResponse,
                 auto_select: false,
+              });
+              // Create button container
+              const btnDiv = document.createElement("div");
+              btnDiv.id = "g_id_signin_btn";
+              container.appendChild(btnDiv);
+              // Render the button manually (required for dynamically created elements)
+              window.google.accounts.id.renderButton(btnDiv, {
+                type: "standard",
+                shape: "rectangular",
+                theme: "outline",
+                text: "signin_with",
+                size: "large",
+                logo_alignment: "center",
+                width: 300,
               });
             } else {
               // Show config error
