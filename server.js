@@ -206,7 +206,7 @@ const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days absolute hard limit
 const SESSION_INACTIVITY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days of inactivity
 const MIN_PASSWORD_LENGTH = 6;
-const MAX_BODY_AUTH = 1024;
+const MAX_BODY_AUTH = 8192;
 const MAX_BODY_SYNC = 65536;
 
 // ============================================================
