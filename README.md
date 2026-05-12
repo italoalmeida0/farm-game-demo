@@ -1,330 +1,461 @@
-# 🌾 Happy Harvest - Farm Game
+# 🌾 Happy Harvest — Farm Game
 
-A complete **offline-first** farm game built with a **server-authoritative** architecture using **WAL (Write-Ahead Log)** synchronization. The backend runs on [Bun](https://bun.sh) and the frontend is a single-file HTML/CSS/JS application.
+An idle/progressive farm game running 100% in the browser, powered by a **Bun** backend with JSON file persistence. Plant, care, harvest, raise animals, and sell products to level up and unlock new items.
 
 ---
 
-## 🏗️ Architecture & Stack
+## 📁 Project Structure
 
-### Runtime & Framework
+```
+.
+├── server.js              # Bun HTTP server (auth + sync logic)
+├── index.html             # SPA client (HTML + CSS + vanilla JS)
+├── shared/
+│   ├── gameData.js        # Game data: seeds, animals, XP tables, modes
+│   └── validation.js      # Action validation, WAL, default player state
+├── data/
+│   ├── accounts.json      # Credentials (PBKDF2 hashed)
+│   └── players/           # Player states (one .json file per player)
+│       └── player_*.json
+```
 
-| Component | Technology | Why |
+---
+
+## 🎮 How the Game Works
+
+### Objective
+Manage a farm: plant crops, handle irrigation and pests, raise animals in the barn, and sell everything in the warehouse to earn coins and experience (XP).
+
+### Core Mechanics
+
+| Mechanic | Description |
+|----------|-------------|
+| **Farm (5×6 = 30 slots)** | Each slot can be empty, tilled, planted, or ready to harvest. |
+| **Seeds** | Bought in **packs**. Each pack contains N seeds (e.g. 4 turnip seeds). Planting consumes 1 pack; harvesting consumes 1 seed from the pack. When the pack runs out, the slot resets to empty. |
+| **Growth** | Each crop has a grow time. **Dry** soil pauses growth. |
+| **Watering** | Soil dries periodically; watering with 🚿 resumes growth and gives +2 XP. |
+| **Pests** | Can appear on crops (chance per cycle). Pests drain **health**, reducing XP and sell price. Removing pests gives +2 XP. |
+| **Pesticide** | Can be applied to slots to prevent pests for a duration. |
+| **Barn (Animals)** | Buy chickens, cows, and sheep. They grow from baby → adult, then produce eggs, milk, or wool when fed. |
+| **Feeding** | Adult animals need **feed** (bought in the shop) to start producing. |
+| **Warehouse** | Stores crops and animal products. You can sell items individually or **sell all at once**. |
+| **Levels** | Earn XP to level up. New seeds and animals are unlocked as your level increases. |
+| **Slot Unlocking** | 6 initial slots are free; additional slots cost increasingly more gold. |
+
+### Game Modes
+
+The game supports two modes via the `GAME_MODE` environment variable:
+
+| | **Dev** (`dev`) | **Prod** (`prod`) |
 |---|---|---|
-| **Backend Runtime** | [Bun](https://bun.sh) | Fast all-in-one JavaScript/TypeScript runtime with native `fetch`, file I/O (`Bun.write`/`Bun.file`), and Web Crypto API. Eliminates the need for Express, Node.js, or npm dependencies. |
-| **Frontend** | Single-file HTML + CSS + JS | Zero build step — the browser loads `index.html` directly. Game logic is inlined. |
-| **Shared Code** | TypeScript (`shared/` directory) | Types, game data, and validation logic are shared between backend (Bun) and frontend (inlined at build time). Single source of truth. |
-| **Persistence** | JSON files on disk | Write-through per-player files (`data/players/{id}.json`) + accounts file (`data/accounts.json`). No database needed for this scale. |
-| **Protocol** | HTTP REST (JSON) | `POST /api/sync` for WAL batches, `POST /api/register` & `POST /api/login` for auth, `GET /api/state` for state refresh. |
+| Starting coins | 5,000 | 100 |
+| Growth speed | **×20 faster** (multiplier 0.05) | Real time (×1) |
+| Sell prices | **×10** | ×1 |
+| Buy prices | **×0.2** (80% off) | ×1 |
+| Soil dries | Every 30s | Every 10 min |
+| Pests | 60% chance every 20s | 15% chance every 15 min |
+| Client sync | Every 5s | Every 5s |
 
-### Why This Stack?
-
-- **Zero dependencies** — No `node_modules`, no `npm install`, no build tools. Just `bun run server.ts`.
-- **Single binary deployment** — Bun handles HTTP server, file I/O, and crypto natively.
-- **Offline-first gameplay** — The game works immediately in the browser; sync happens in the background.
-- **Shared validation** — The same `validation.ts` runs on both client and server, catching cheaters early.
+> **Dev mode** is ideal for testing and fast demos without waiting hours.
 
 ---
 
-## 📐 System Architecture
+## 🏗️ Backend Architecture
+
+### Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    FRONTEND (Browser)                    │
-│                                                         │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────────────┐  │
-│  │  Game    │  │  Local   │  │   WAL Buffer          │  │
-│  │  Engine  │──│  State   │──│   (action queue)       │  │
-│  │ (render) │  │ (RAM)    │  │                        │  │
-│  └──────────┘  └──────────┘  └─────────┬──────────────┘  │
-│       ▲              ▲                  │                 │
-│       │              │                  │ Every ~5s       │
-│       │    Shared Validation            ▼                 │
-│       │    (validation.ts)     ┌────────────────────┐    │
-│       │              ▲        │   Sync Engine       │    │
-│       │              │        │   POST /api/sync    │    │
-│       │              │        └────────┬────────────┘    │
-└───────┼──────────────┼─────────────────┼─────────────────┘
-        │              │                 │
-        │              │    HTTP JSON    │
-        │              │                 ▼
-┌───────┼──────────────┼───────────────────────────────────┐
-│       │       Shared │   Validation   BACKEND (Bun)      │
-│       │       (same  │   (validation.ts)                 │
-│       │        file) │                                   │
-│       │              │   ┌──────────────────────────┐    │
-│       │              │   │   In-Memory State Map    │    │
-│       │              ├───│   Map<playerId, State>   │    │
-│       │              │   └──────────────────────────┘    │
-│       │              │   ┌──────────────────────────┐    │
-│       │              │   │   WAL Processor          │    │
-│       │              └───│   (lock → growth ticks   │    │
-│       │                  │    → validate → apply     │    │
-│       │                  │    → persist → respond)   │    │
-│       │                  └──────────────────────────┘    │
-│       │              ┌──────────────────────────────┐    │
-│       └──────────────│   Write-Through Persistence  │    │
-│                      │   data/players/{id}.json     │    │
-│                      └──────────────────────────────┘    │
-└───────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT (Browser)                            │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │  index.html  │───▶│ Local Sim    │───▶│ WAL Buffer (actions[])   │   │
+│  │  (SPA UI)    │    │ (growth,     │    │ Pending actions to sync  │   │
+│  └──────────────┘    │  animals)    │    └──────────────────────────┘   │
+│                      └──────────────┘                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ POST /api/sync  { wal: actions[] }
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              SERVER (Bun)                                │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │ HTTP Handler │───▶│ Auth +       │───▶│ Player Lock (TTL 10s)    │   │
+│  │ server.js    │    │ Sessions     │    │ Prevents race conditions │   │
+│  └──────────────┘    └──────────────┘    └──────────────────────────┘   │
+│         │                                           │                    │
+│         ▼                                           ▼                    │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
+│  │ Growth Ticks │◀───│ WAL Validator│◀───│ shared/validation.js     │   │
+│  │ applyGrowth  │    │ validateAnd  │    │ Business rules + state   │   │
+│  │ Ticks()      │    │ ApplyWAL()   │    │ mutations                │   │
+│  └──────────────┘    └──────────────┘    └──────────────────────────┘   │
+│         │                                           │                    │
+│         └───────────────────────────────────────────┘                    │
+│                              │                                           │
+│                              ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │ Write-Through Persistence                                        │    │
+│  │  • data/players/*.json  → player states                          │    │
+│  │  • data/accounts.json   → PBKDF2 password hashes                 │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Server: `server.js` (Bun)
+
+The backend is a simple, stateful HTTP server using Bun's native API (`Bun.serve` via `export default { port, fetch }`).
+
+#### Responsibilities
+
+1. **Authentication & Sessions**
+   - Registration and login with **PBKDF2** password hashing (100k iterations, SHA-256).
+   - Session tokens are 32-byte hex strings (valid for 24h).
+   - Token-based reconnection without re-entering password.
+   - Brute-force protection: 15-minute lockout after 5 failed attempts.
+
+2. **Persistence**
+   - **Accounts**: `data/accounts.json` — map of username → `{ passwordHash, playerId }`.
+   - **Players**: `data/players/player_<id>.json` — full player state.
+   - **Write-through**: every mutation is immediately saved to disk via `Bun.write`.
+   - **Boot restore**: on startup, the server loads all accounts and players into memory.
+
+3. **WAL-based Sync**
+   - The client accumulates actions locally and sends them in batches (`POST /api/sync`) as a **WAL (Write-Ahead Log)**.
+   - The server validates each action in order, enforcing business rules (enough money? required level? valid slot?).
+   - Rejected actions are returned to the client, which discards them.
+   - Timestamp validation: prevents future actions, stale actions (>120s), and out-of-order actions.
+   - **Per-player lock**: a TTL lock prevents race conditions during sync.
+
+4. **Growth Ticks**
+   - `applyGrowthTicks(state, now, isServer=true)` runs on the server on every sync.
+   - Computes: soil drying, pests (deterministic RNG), health drain, crop growth, animal maturation, and product readiness.
+
+5. **Static Files**
+   - `GET /` → [`index.html`](index.html:1)
+   - `GET /shared/gameData.js` and `/shared/validation.js` → shared ES modules imported by the frontend.
+
+#### API Endpoints
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/health` | Health check |
+| `GET` | `/api/stats` | Server stats (memory, players, sessions) |
+| `POST` | `/api/register` | Create account; returns token + initial state |
+| `POST` | `/api/login` | Login with username/password or reconnect with token |
+| `GET` | `/api/state` | Returns current state for the authenticated player |
+| `POST` | `/api/sync` | Sends WAL for server-side validation and application |
+
+---
+
+## 🔒 Sync Architecture & Anti-Cheat Security
+
+### Why the Sync is Secure
+
+The client **never sends the final state** (e.g. "I now have 9999 coins"). Instead, it only sends **actions** (e.g. "I bought a seed", "I harvested a tomato"). The server is the **single source of truth** and recalculates everything from scratch.
+
+```
+NORMAL PLAYER FLOW                           HACKER ATTEMPT
+─────────────────────                       ───────────────
+
+Player clicks "Buy Seed"                   Hacker edits localStorage
+    │                                            │
+    ▼                                            ▼
+Client applies locally                       Client state is fake
+    │                                            │
+    ▼                                            ▼
+WAL buffer: {BUY tomato, qty:1}              WAL buffer: {BUY pumpkin, qty:999}
+    │                                            │
+    └──────────────┐                           └──────────────┐
+                   │                                          │
+                   ▼                                          ▼
+            ┌────────────┐                            ┌────────────┐
+            │  SERVER    │                            │  SERVER    │
+            │            │                            │            │
+            │ 1. Apply growth ticks                  │ 1. Apply growth ticks
+            │ 2. Validate: coins >= cost?   ──YES──▶ │ 2. Validate: coins >= cost?
+            │ 3. Deduct coins, add item                │ 3. 999 × 400 = 360000 > 5000
+            │ 4. Save to disk                        │ 4. REJECT ❌
+            │                                          │    "Not enough coins"
+            │                                          │
+            │ 200 OK { state }                         │ 200 OK { state, rejectedActions }
+            │                                          │
+            └────────────┘                            └────────────┘
+                   │                                          │
+                   ▼                                          ▼
+            Client replaces local                      Client replaces local
+            state with server state                    state with server state
+            (hacker's fake coins are wiped!)           (hacker's fake buy is ignored!)
+```
+
+### Validation Layers for Every Action
+
+When the server receives a `BUY` action, for example, it goes through multiple validation layers:
+
+```
+                    ┌─────────────────┐
+                    │  ACTION ARRIVES │
+                    │   IN THE WAL    │
+                    └────────┬────────┘
+                             │
+                             ▼
+              ┌──────────────────────────┐
+              │  1. TIMESTAMP VALIDATION │
+              │  • Not in future (>10s)  │
+              │  • Not too old (<120s)   │
+              │  • Monotonically rising  │
+              └────────────┬─────────────┘
+                           │
+              ┌────────────┴─────────────┐
+              │ INVALID ◀────────────────┤
+              └────────────┬─────────────┘
+                           │ VALID
+                           ▼
+              ┌──────────────────────────┐
+              │  2. PLAYER LOCK          │
+              │  Acquire lock (TTL 10s)  │
+              │  Prevents parallel syncs │
+              └────────────┬─────────────┘
+                           │
+              ┌────────────┴─────────────┐
+              │ LOCKED ◀─────────────────┤
+              └────────────┬─────────────┘
+                           │ ACQUIRED
+                           ▼
+              ┌──────────────────────────┐
+              │  3. BUSINESS RULES       │
+              │  Based on action type:   │
+              └────────────┬─────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+    ┌─────────┐      ┌─────────┐      ┌─────────┐
+    │  BUY    │      │ PLANT   │      │ HARVEST │
+    │         │      │         │      │         │
+    │ Enough  │      │ Has     │      │ Slot is │
+    │ coins?  │      │ seeds?  │      │ ready?  │
+    │ Level   │      │ Tilled? │      │         │
+    │ ok?     │      │ Watered?│      │         │
+    └────┬────┘      └────┬────┘      └────┬────┘
+         │                │                │
+    ┌────┴────┐      ┌────┴────┐      ┌────┴────┐
+    │ NO ◀────┤      │ NO ◀────┤      │ NO ◀────┤
+    └────┬────┘      └────┬────┘      └────┬────┘
+         │ YES            │ YES            │ YES
+         ▼                ▼                ▼
+    ┌─────────┐      ┌─────────┐      ┌─────────┐
+    │ APPLY:  │      │ APPLY:  │      │ APPLY:  │
+    │ -coins  │      │ -seed   │      │ +crop   │
+    │ +item   │      │ +plant  │      │ +XP     │
+    └────┬────┘      └────┬────┘      └────┬────┘
+         │                │                │
+         └────────────────┼────────────────┘
+                          │
+                          ▼
+              ┌──────────────────────────┐
+              │  4. SAVE TO DISK         │
+              │  write-through per player│
+              └────────────┬─────────────┘
+                           │
+                           ▼
+              ┌──────────────────────────┐
+              │  5. RELEASE LOCK         │
+              └────────────┬─────────────┘
+                           │
+                           ▼
+              ┌──────────────────────────┐
+              │  6. RETURN UPDATED STATE │
+              └──────────────────────────┘
+```
+
+### What Happens if a Hacker Tries...
+
+| Attack | Server Defense |
+|--------|---------------|
+| **"Buy item without enough money"** | Server recalculates total cost and checks `state.coins >= totalCost`. Rejects if insufficient. |
+| **Buy level-locked item** | Every seed/animal has a `requiredLevel`. Server checks `state.level` before applying. |
+| **Replay another player's actions** | The WAL is processed within the authenticated player's state via Bearer token. No cross-player mixing. |
+| **Replay old actions** | Timestamps must be monotonically increasing within the WAL and cannot be older than 120s. |
+| **Send future-dated actions** | Future timestamps beyond 10s tolerance are rejected. |
+| **Edit local state (coins, XP)** | Local state is **overwritten** by the server on every sync. DevTools edits do not persist. |
+| **Parallel sync (race condition)** | A TTL lock per `playerId` ensures only one sync is processed at a time. |
+| **Send a huge WAL** | Maximum 50 actions per WAL; exceeding this rejects the entire WAL. |
+| **Path traversal** (`../../../etc/passwd`) | Paths containing `..` are blocked before any processing. |
+| **Brute-force password** | 5 failed attempts = 15-minute lockout per username. |
+
+### Deterministic Pest RNG
+
+Pests do not use raw `Math.random()`, which could diverge between client and server. Instead, they use a deterministic hash:
+
+```javascript
+const hash = (slotIndex * 31 + cycle * 17 + plantedAt) % 100;
+if (hash < PEST_APPEAR_CHANCE * 100) spawnPest();
+```
+
+This ensures the server and client (when importing `validation.js`) compute **exactly the same pests** for the same state, preventing desync.
+
+---
+
+## 🔄 Detailed WAL Sync Flow
+
+```
+CLIENT                                              SERVER
+─────────────────────────────────────────────────────────────────────────
+
+User clicks (plant, water, harvest...)
+    │
+    ▼
+┌─────────────┐
+│ Apply local │  ← Instant visual feedback
+│ (optimistic)│
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ WAL Buffer  │  ← Accumulates actions
+│ [action1,   │
+│  action2,   │
+│  ...]       │
+└──────┬──────┘
+       │
+       │ Every 5 seconds (or on demand)
+       │ POST /api/sync
+       │ { wal: { actions: [...], createdAt: ts } }
+       └──────────────────────────────────────────────▶
+                                                       │
+                                                       ▼
+                                              ┌─────────────┐
+                                              │ Acquire Lock│
+                                              │ playerId    │
+                                              └──────┬──────┘
+                                                     │
+                                            ┌────────┴────────┐
+                                            │ LOCKED ◀────────┤
+                                            └────────┬────────┘
+                                                     │ FREE
+                                                     ▼
+                                              ┌─────────────┐
+                                              │ applyGrowth │
+                                              │ Ticks(state)│
+                                              │ (server)    │
+                                              └──────┬──────┘
+                                                     │
+                                                     ▼
+                                              ┌─────────────┐
+                                              │ validateAnd │
+                                              │ ApplyWAL()  │
+                                              │             │
+                                              │ For each    │
+                                              │ action:     │
+                                              │ 1. Validate │
+                                              │    timestamp│
+                                              │ 2. Validate │
+                                              │    business │
+                                              │    rules    │
+                                              │ 3. Apply or │
+                                              │    reject   │
+                                              └──────┬──────┘
+                                                     │
+                                                     ▼
+                                              ┌─────────────┐
+                                              │ Save Player │
+                                              │ to Disk     │
+                                              │ (write-thru)│
+                                              └──────┬──────┘
+                                                     │
+                                                     ▼
+                                              ┌─────────────┐
+                                              │ Release Lock│
+                                              └──────┬──────┘
+                                                     │
+       ◀─────────────────────────────────────────────┘
+       │ 200 OK
+       │ { state, rejectedActions[] }
+       │
+       ▼
+┌─────────────┐
+│ Replace     │  ← Local state overwritten by server
+│ local state │    (the source of truth)
+│ with server │
+│ state       │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Remove      │  ← Accepted actions removed from buffer
+│ accepted    │    Rejected actions logged to console
+│ from WAL    │
+└─────────────┘
 ```
 
 ---
 
-## 🔄 How the Game Works
-
-### 1. Registration & Authentication
-
-Players create accounts with **username + password**. The server:
-
-1. Validates the username (2-64 chars, alphanumeric + spaces + underscores)
-2. Hashes the password with **PBKDF2** (SHA-256, 100,000 iterations, 32-byte random salt)
-3. Creates a default [`PlayerState`](shared/types.ts:62) with 100 coins, 100 energy, and starter tools/seeds
-4. Generates a cryptographically random 64-char hex **session token**
-5. Persists everything to disk immediately (write-through)
-6. Returns `{ token, state }` to the client
-
-On subsequent visits, the client sends the stored token to **reconnect** without re-entering credentials. Sessions expire after **24 hours**.
-
-### 2. Offline-First Gameplay
-
-Once authenticated, the frontend receives the **full game state** from the server. This state lives in browser RAM with the exact same structure as the backend's [`PlayerState`](shared/types.ts:62).
-
-Every player action (till, plant, water, harvest, buy, sell, upgrade):
-
-1. **Validates locally** using the shared [`validation.ts`](shared/validation.ts) logic
-2. **Applies to local state** immediately — the UI updates instantly, no server round-trip
-3. **Appends to WAL buffer** — a queue of actions waiting to be synced
-
-This means the game feels instant even on slow connections.
-
-### 3. WAL Synchronization (every ~5 seconds)
-
-The frontend syncs with the server every 5 seconds via [`POST /api/sync`](server.ts:808):
-
-```
-Frontend                              Backend
-   │                                    │
-   │  ── POST /api/sync ──────────────► │
-   │     Authorization: Bearer TOKEN    │
-   │     { wal: { version, actions[] } }│
-   │                                    │── Extract playerId from auth token (NOT from body)
-   │                                    │── Acquire per-player lock (10s TTL)
-   │                                    │── Apply growth ticks (crop progress + energy regen)
-   │                                    │── Validate each action timestamp (monotonic, not stale, not future)
-   │                                    │── Validate each action logic (resources, slot state, tools)
-   │                                    │── Apply valid actions to state
-   │                                    │── Increment state version
-   │                                    │── Persist to disk (write-through)
-   │                                    │── Release lock
-   │  ◄── { state: PlayerState } ────── │
-   │                                    │
-   │── Replace local state with         │
-   │   authoritative server state       │
-   │── Flush synced WAL buffer          │
-   │── Continue accumulating new        │
-   │   actions in fresh buffer          │
-```
-
-If the WAL has **no actions** (empty `[]`), it acts as a **heartbeat** — the server still processes growth ticks and returns updated state. This keeps crops growing and energy regenerating even when the player is idle.
-
-### 4. Concurrent WAL Protection
-
-- While a sync request is in-flight, new actions accumulate in a **second WAL buffer**
-- Server uses a **per-player lock** ([`acquireLock()`](server.ts:550)) with a 10-second TTL to prevent concurrent processing
-- If the player is locked (HTTP 423), the frontend retries with unsent actions
-- After lock release, the frontend merges both buffers for the next sync
-
-### 5. Shared Validation — Single Source of Truth
-
-[`shared/validation.ts`](shared/validation.ts) is imported by **both** the backend (Bun) and inlined in the frontend. It provides:
-
-- **Slot validity** — is the farm slot in the correct state for the action?
-- **Energy costs** — does the player have enough energy?
-- **Item existence** — does the player own the required tool/seeds?
-- **Inventory management** — stack limits, quantity checks
-- **Growth calculations** — crop progress based on elapsed time + water bonus
-- **Timestamp validation** — actions can't be from the future, too old, or out of order
-- **WAL size limits** — max 50 actions per sync batch
-
-The frontend validates before applying locally → catches 99% of issues client-side.
-The server validates authoritatively → catches tampered clients.
-
----
-
-## 🎮 Game Mechanics
-
-### Starting State
-
-| Resource | Value |
-|---|---|
-| Coins | 100 🪙 |
-| Energy | 100 / 100 ⚡ |
-| Farm Grid | 6 rows × 8 columns (48 slots) |
-| Starter Inventory | 1 Hoe, 1 Watering Can, 1 Scythe, 5 Wheat Seeds |
-
-### Farm Lifecycle
-
-Each farm slot follows this state machine:
-
-```
-empty ──(till)──► tilled ──(plant)──► planted ──(grow)──► ready ──(harvest)──► empty
-                       ──(water)──►  (faster growth)       │
-                       ──(fertilize)──►  (+50% progress)   │
-```
-
-### Crops
-
-| Crop | Seed Price | Sell Price | Grow Time | Water Bonus | Season |
-|---|---|---|---|---|---|
-| 🌾 Wheat | 5🪙 | 12🪙 | 30s | 1.5× speed | All |
-| 🥕 Carrot | 8🪙 | 18🪙 | 45s | 1.3× speed | Spring |
-| 🍅 Tomato | 12🪙 | 28🪙 | 60s | 1.4× speed | Summer |
-| 🌽 Corn | 15🪙 | 35🪙 | 90s | 1.2× speed | Summer |
-| 🎃 Pumpkin | 20🪙 | 50🪙 | 120s | 1.3× speed | Fall |
-| 🍓 Strawberry | 25🪙 | 60🪙 | 150s | 1.6× speed | Spring |
-
-**Watering** speeds up growth by the crop's water bonus multiplier. Watering has a 30-second cooldown per slot.
-
-### Tools & Items
-
-| Item | Buy Price | Sell Price | Energy Cost |
-|---|---|---|---|
-| 🪓 Hoe | 50🪙 | 25🪙 | 5⚡ per use |
-| 💧 Watering Can | 75🪙 | 35🪙 | 2⚡ per use |
-| 🫳 Scythe | 100🪙 | 50🪙 | 4⚡ per use |
-| 🧪 Fertilizer | 30🪙 | 10🪙 | 2⚡ per use |
-
-Tools (Hoe, Watering Can, Scythe) are **non-stackable** (max 1). Fertilizer is stackable up to 50. Using fertilizer on a planted crop instantly advances growth by **50%**.
-
-### Energy System
-
-- Starts at **100/100** ⚡
-- Regenerates **1 energy every 5 seconds**
-- Can be upgraded in tiers: 100🪙 → 150 max, 200🪙 → 200 max, 400🪙 → 250 max, 800🪙 → 300 max, 1500🪙 → 350 max
-- Energy fully refills on each upgrade
-
-### XP & Levels
-
-| Action | XP Gained |
-|---|---|
-| Till | +2 XP |
-| Plant | +5 XP |
-| Water | +1 XP |
-| Harvest | +10 XP |
-| Buy/Sell | +1 XP per item |
-| Fertilize | +3 XP |
-| Energy Upgrade | +20 XP |
-
-| Level | XP Required | Cumulative |
-|---|---|---|
-| 1→2 | 100 | 100 |
-| 2→3 | 250 | 350 |
-| 3→4 | 500 | 850 |
-| 4→5 | 850 | 1,700 |
-| 5→6 | 1,300 | 3,000 |
-| 6→7 | 1,900 | 4,900 |
-| 7→8 | 2,700 | 7,600 |
-| 8→9 | 3,800 | 11,400 |
-| 9→10 | 5,200 | 16,600 |
-
----
-
-## 🔒 Security & Anti-Cheat
-
-| Protection | Implementation |
-|---|---|
-| **Server-authoritative state** | Server always returns the final [`PlayerState`](shared/types.ts:62); client state is replaced on every sync |
-| **Identity from auth token** | Player identity comes from `Authorization: Bearer TOKEN`, never from the WAL body — prevents impersonation |
-| **PBKDF2 password hashing** | 100,000 iterations, SHA-256, 32-byte random salt. Legacy SHA-256 hashes are auto-migrated on login |
-| **Brute-force lockout** | 5 failed login attempts → 15-minute account lockout |
-| **Per-IP rate limiting** | 200 requests/minute general, 3 registrations/10 minutes |
-| **Timestamp validation** | Actions rejected if: future (>10s tolerance), stale (>2min old), or out-of-order within a WAL |
-| **Server-side timestamps** | [`plantedAt`](shared/validation.ts:276) and [`wateredAt`](shared/validation.ts:297) use server time, not client time — prevents time manipulation |
-| **WAL version tracking** | Client sends its state version; server detects desyncs |
-| **Per-player locks** | 10-second TTL lock prevents race conditions from multiple tabs/clients |
-| **WAL size limit** | Max 50 actions per sync batch — rejects oversized WALs entirely |
-| **Session expiry** | Tokens expire after 24 hours; expired sessions are cleaned every 5 minutes |
-| **Path traversal blocking** | `..` in paths and `/data/` access are blocked |
-| **Content-Type enforcement** | POST endpoints require `application/json` |
-| **Body size limits** | 1KB for auth endpoints, 64KB for sync endpoint |
-| **Constant-time comparison** | PBKDF2 hash verification uses constant-time byte comparison to prevent timing attacks |
-
----
-
-## 📁 File Structure
-
-```
-farm-game/
-├── shared/                        # Shared between frontend & backend
-│   ├── types.ts                   # TypeScript types (PlayerState, Actions, WAL, etc.)
-│   ├── gameData.ts                # Game constants (crops, items, shop, costs, XP tables)
-│   └── validation.ts              # Validation logic (used by both client and server)
-├── frontend/
-│   ├── index.html                 # Complete game UI (HTML + CSS + JS)
-│   └── hacker.html                # Debug/security testing page (gated behind ENABLE_DEBUG)
-├── data/                          # Persistence directory (auto-created)
-│   ├── accounts.json              # Username → {passwordHash, playerId} mapping
-│   └── players/                   # Per-player state files
-│       └── player_{id}.json       # Full PlayerState snapshot
-├── server.ts                      # Bun backend server (HTTP, auth, sync, persistence)
-├── package.json                   # Project metadata and scripts
-└── README.md                      # This file
-```
-
----
-
-## 🚀 Running
+## 🚀 How to Run
 
 ### Prerequisites
+- [Bun](https://bun.sh) installed.
 
-- [Bun](https://bun.sh) runtime installed (`curl -fsSL https://bun.sh/install | bash`)
-
-### Start the Server
-
-```bash
-cd farm-game
-bun run server.ts
-```
-
-Or with watch mode for development:
+### Production (default mode)
 
 ```bash
-bun run dev
+bun server.js
 ```
 
-### Open the Game
+Server starts at [`http://localhost:3456`](http://localhost:3456).
 
-Navigate to **http://localhost:3456** in your browser.
+### Development Mode (accelerated timers)
 
-### Environment Variables
+**PowerShell:**
+```powershell
+$env:GAME_MODE="dev"
+bun server.js
+```
 
-| Variable | Default | Description |
-|---|---|---|
-| `NODE_ENV` | `development` | Set to `production` to disable debug pages and extra logging |
-| `ENABLE_DEBUG` | Auto from NODE_ENV | Set to `true` to enable the `/hacker` debug page |
+**Bash / Linux / macOS:**
+```bash
+GAME_MODE=dev bun server.js
+```
 
-### Keyboard Shortcuts
+**Windows CMD:**
+```cmd
+set GAME_MODE=dev
+bun server.js
+```
 
-| Key | Action |
-|---|---|
-| `1` | Select tool (pointer) |
-| `2` | Till (hoe) |
-| `3` | Plant |
-| `4` | Water |
-| `5` | Harvest |
-| `6` | Fertilize |
+> In dev mode the console shows: `Mode: DEV (fast demo: accelerated timers, 5k coins, high pest chance)`.
 
 ---
 
-## 🔌 API Endpoints
+## 💾 Persistence
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/health` | No | Health check (no rate limit) |
-| `POST` | `/api/register` | No | Create account (username + password) |
-| `POST` | `/api/login` | No | Login (username + password) or reconnect (token) |
-| `GET` | `/api/state` | Yes | Get current player state |
-| `POST` | `/api/sync` | Yes | Submit WAL batch, receive authoritative state |
-| `GET` | `/api/shop` | Yes | Get shop items list |
-| `GET` | `/` | No | Serve game frontend |
-| `GET` | `/hacker` | No | Debug page (only in development mode) |
+Data is automatically saved to:
+- `data/accounts.json` — accounts
+- `data/players/*.json` — player states
+
+To **reset everything**, simply delete the `data/` folder (or specific files inside it) and restart the server.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Runtime**: [Bun](https://bun.sh) (native JavaScript/TypeScript, web-compatible APIs)
+- **Frontend**: HTML5 + CSS3 + Vanilla JS (no frameworks)
+- **Database**: JSON files on the filesystem (zero external dependencies)
+- **Auth**: PBKDF2 via Web Crypto API
+- **Protocol**: HTTP/1.1 with JSON, CORS enabled
+
+---
+
+## 📝 Notes
+
+- The game is designed to be **lag-resilient**: the client simulates growth locally and syncs via WAL; the server is the source of truth.
+- Pests use a **deterministic RNG** based on a hash of slot index + cycle + plant time, ensuring consistency between server and client.
+- There is no WebSocket — all communication is HTTP polling every 5 seconds (or on-demand when the player performs actions).
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the conditions in the [LICENSE](LICENSE) file.
