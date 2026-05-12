@@ -1693,24 +1693,33 @@
             padding-top: 16px;
           "
         >
-          <div
-            id="g_id_onload"
-            data-client_id="161775002744-llru57d8q7f8i8d5vevns0ogk0eecpm9.apps.googleusercontent.com"
-            data-context="signin"
-            data-ux_mode="popup"
-            data-callback="handleGoogleCredentialResponse"
-            data-auto_prompt="false"
-          ></div>
-          <div
-            class="g_id_signin"
-            data-type="standard"
-            data-shape="rectangular"
-            data-theme="outline"
-            data-text="signin_with"
-            data-size="large"
-            data-logo_alignment="center"
-            data-width="300"
-          ></div>
+          <div id="google-signin-container">
+            <div
+              id="g_id_onload"
+              data-context="signin"
+              data-ux_mode="popup"
+              data-callback="handleGoogleCredentialResponse"
+              data-auto_prompt="false"
+            ></div>
+            <div
+              id="g_id_signin_btn"
+              class="g_id_signin"
+              data-type="standard"
+              data-shape="rectangular"
+              data-theme="outline"
+              data-text="signin_with"
+              data-size="large"
+              data-logo_alignment="center"
+              data-width="300"
+            ></div>
+            <div
+              class="login-error"
+              id="google-config-error"
+              style="margin-top: 8px; display: none"
+            >
+              Google Sign-In is not configured on this server.
+            </div>
+          </div>
           <div
             class="login-error"
             id="google-error"
@@ -2413,6 +2422,43 @@
           } else {
             ba.indicatorEl.style.display = "none";
           }
+        }
+      }
+
+      // ============================================================
+      // SERVER CONFIG (Google Client ID, VAPID Key)
+      // ============================================================
+      let serverGoogleClientId = "";
+      let serverVapidPublicKey = "";
+
+      async function loadServerConfig() {
+        try {
+          const res = await fetch(`${API_BASE}/api/config`);
+          if (res.ok) {
+            const data = await res.json();
+            serverGoogleClientId = data.googleClientId || "";
+            serverVapidPublicKey = data.vapidPublicKey || "";
+            // Update Google sign-in button if client ID is available
+            if (serverGoogleClientId && window.google && window.google.accounts) {
+              const onloadDiv = document.getElementById("g_id_onload");
+              if (onloadDiv) {
+                onloadDiv.setAttribute("data-client_id", serverGoogleClientId);
+                window.google.accounts.id.initialize({
+                  client_id: serverGoogleClientId,
+                  callback: handleGoogleCredentialResponse,
+                  auto_select: false,
+                });
+              }
+            } else {
+              // Hide Google button, show config error
+              const btnDiv = document.getElementById("g_id_signin_btn");
+              const errDiv = document.getElementById("google-config-error");
+              if (btnDiv) btnDiv.style.display = "none";
+              if (errDiv) errDiv.style.display = "";
+            }
+          }
+        } catch (e) {
+          // Server might be older version without /api/config
         }
       }
 
@@ -3888,10 +3934,13 @@
       let pushSubscription = null;
 
       async function getVapidPublicKey() {
+        // Use cached server config if available
+        if (serverVapidPublicKey) return serverVapidPublicKey;
         try {
           const res = await fetch(`${API_BASE}/api/vapid-public-key`);
           const data = await res.json();
-          return data.publicKey;
+          if (data.success === false) return null;
+          return data.publicKey || null;
         } catch {
           return null;
         }
@@ -4525,6 +4574,9 @@
           window.location.reload();
         });
       }
+
+      // Load server config (Google Client ID, VAPID key) on startup
+      loadServerConfig();
 
       // Expose settings functions to global scope for inline onclick handlers
       globalThis.openSettings = openSettings;

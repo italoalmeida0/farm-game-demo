@@ -34,15 +34,12 @@ try {
   webpush = await import('web-push');
 } catch { /* web-push not available */ }
 
-// Fallback generic keys (only used if .env is not configured)
-const DEFAULT_VAPID_PUBLIC = 'BHYVLRZAL6hRofwaL0VktVdEBw9PyGTJTAv7NkkrMvJOIGJHiv2SKs7i1M8sjZ8XIp0gy4PRpD39Xr0ze-eqAXQ';  //CHANGE THIS TO YOUR OWN PRIVATE KEY FOR PRODUCTION ON .env (generate with: npx web-push generate-vapid-keys)
-const DEFAULT_VAPID_PRIVATE = 'fZe-Ozcimd5hatpURnly2T1NH4bHj_qQxcLpvecaGYI'; //CHANGE THIS TO YOUR OWN PRIVATE KEY FOR PRODUCTION ON .env (generate with: npx web-push generate-vapid-keys)
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || '';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:test@blackhole.postmarkapp.com';
-
-if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT) {
   webpush.default.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
@@ -678,6 +675,14 @@ async function handleRequest(req) {
     return jsonResp({ status: 'ok' }, 200, origin);
   }
 
+  if (path === '/api/config') {
+    if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+    return jsonResp({
+      googleClientId: GOOGLE_CLIENT_ID || null,
+      vapidPublicKey: VAPID_PUBLIC_KEY || null,
+    }, 200, origin);
+  }
+
   if (path === '/api/stats') {
     if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
     const mem = process.memoryUsage();
@@ -855,7 +860,9 @@ async function handleRequest(req) {
         }
 
         // Validate audience
-        const GOOGLE_CLIENT_ID = '161775002744-llru57d8q7f8i8d5vevns0ogk0eecpm9.apps.googleusercontent.com';
+        if (!GOOGLE_CLIENT_ID) {
+          return jsonResp({ success: false, error: 'Google Sign-In is not configured on this server' }, 503, origin);
+        }
         if (googlePayload.aud !== GOOGLE_CLIENT_ID) {
           return jsonResp({ success: false, error: 'Invalid token audience' }, 401, origin);
         }
@@ -949,7 +956,9 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'Failed to verify Google token' }, 500, origin);
         }
 
-        const GOOGLE_CLIENT_ID = '161775002744-llru57d8q7f8i8d5vevns0ogk0eecpm9.apps.googleusercontent.com';
+        if (!GOOGLE_CLIENT_ID) {
+          return jsonResp({ success: false, error: 'Google Sign-In is not configured on this server' }, 503, origin);
+        }
         if (googlePayload.aud !== GOOGLE_CLIENT_ID) {
           return jsonResp({ success: false, error: 'Invalid token audience' }, 401, origin);
         }
@@ -1110,6 +1119,10 @@ async function handleRequest(req) {
         const clErr = validateContentLength(req, 4096, origin);
         if (clErr) return clErr;
 
+        if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
+          return jsonResp({ success: false, error: 'Push notifications are not configured on this server' }, 503, origin);
+        }
+
         const state = getPlayerFromAuth(req.headers.get('authorization'));
         if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
 
@@ -1136,6 +1149,9 @@ async function handleRequest(req) {
       }
 
       if (path === '/api/vapid-public-key') {
+        if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
+          return jsonResp({ success: false, error: 'Push notifications are not configured on this server' }, 503, origin);
+        }
         return jsonResp({ publicKey: VAPID_PUBLIC_KEY }, 200, origin);
       }
 
