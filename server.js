@@ -186,6 +186,7 @@ const players = new Map();
 const accounts = new Map();
 const sessions = new Map();
 const locks = new Map();
+const totpPending = new Map(); // tempToken -> { playerId, expiresAt }
 
 const loginAttempts = new Map();
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -243,6 +244,16 @@ setInterval(() => {
   }
   for (const [ip, entry] of regRateLimits) {
     if (now > entry.resetAt) regRateLimits.delete(ip);
+  }
+  let totpCleaned = 0;
+  for (const [token, entry] of totpPending) {
+    if (now > entry.expiresAt) {
+      totpPending.delete(token);
+      totpCleaned++;
+    }
+  }
+  if (totpCleaned > 0) {
+    console.log(`[CLEANUP] Removed ${totpCleaned} expired TOTP pending sessions`);
   }
 }, 60 * 1000);
 
@@ -377,6 +388,101 @@ function generateSessionToken() {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ============================================================
+// TOTP 2FA HELPERS
+// ============================================================
+
+const TOTP_DIGITS = 6;
+const TOTP_STEP = 30;
+const TOTP_ALGO = 'SHA-1';
+
+function base32Encode(bytes) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (let i = 0; i < bytes.length; i++) {
+    value = ((value << 8) | bytes[i]) >>> 0;
+    bits += 8;
+    while (bits >= 5) {
+      const shift = bits - 5;
+      output += alphabet[(value >>> shift) & 31];
+      value = value & ((1 << shift) - 1);
+      bits = shift;
+    }
+  }
+  if (bits > 0) {
+    output += alphabet[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+function base32Decode(str) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const map = new Map();
+  for (let i = 0; i < alphabet.length; i++) map.set(alphabet[i], i);
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i].toUpperCase();
+    if (c === '=') continue;
+    const idx = map.get(c);
+    if (idx === undefined) continue;
+    value = ((value << 5) | idx) >>> 0;
+    bits += 5;
+    if (bits >= 8) {
+      const shift = bits - 8;
+      bytes.push((value >>> shift) & 255);
+      value = value & ((1 << shift) - 1);
+      bits = shift;
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+function generateTOTPSecret() {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return base32Encode(bytes);
+}
+
+async function hmacSHA1(key, msg) {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', key, { name: 'HMAC', hash: TOTP_ALGO }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, msg);
+  return new Uint8Array(sig);
+}
+
+async function hotp(secret, counter) {
+  const key = base32Decode(secret);
+  const counterBytes = new Uint8Array(8);
+  let c = counter;
+  for (let i = 7; i >= 0; i--) {
+    counterBytes[i] = c & 0xff;
+    c = c >>> 8;
+  }
+  const hash = await hmacSHA1(key, counterBytes);
+  const offset = hash[hash.length - 1] & 0x0f;
+  const code = ((hash[offset] & 0x7f) << 24 |
+                (hash[offset + 1] & 0xff) << 16 |
+                (hash[offset + 2] & 0xff) << 8 |
+                (hash[offset + 3] & 0xff)) % Math.pow(10, TOTP_DIGITS);
+  return String(code).padStart(TOTP_DIGITS, '0');
+}
+
+async function verifyTOTP(secret, token) {
+  if (!secret || !token) return false;
+  const now = Math.floor(Date.now() / 1000);
+  // Allow one step before and after current
+  for (let i = -1; i <= 1; i++) {
+    const expected = await hotp(secret, Math.floor((now + i * TOTP_STEP) / TOTP_STEP));
+    if (expected === token) return true;
+  }
+  return false;
 }
 
 function getClientIp(req) {
@@ -702,6 +808,235 @@ async function handleRequest(req) {
           await saveAccounts();
         }
 
+        // Check if 2FA is enabled
+        if (account.totpSecret) {
+          const tempToken = generateSessionToken();
+          totpPending.set(tempToken, { playerId: account.playerId, username: account.username, expiresAt: Date.now() + 5 * 60 * 1000 }); // 5 min
+          return jsonResp({ success: true, needs2FA: true, tempToken }, 200, origin);
+        }
+
+        const state = players.get(account.playerId);
+        applyGrowthTicks(state, Date.now(), true);
+
+        const now = Date.now();
+        const newToken = generateSessionToken();
+        sessions.set(newToken, { playerId: account.playerId, createdAt: now, lastUsedAt: now, expiresAt: now + SESSION_EXPIRY_MS });
+        debouncedSaveSessions();
+
+        return jsonResp({ success: true, state, token: newToken, mode: GAME_MODE }, 200, origin);
+      }
+
+      // --- Google OAuth Login / Register ---
+      if (path === '/api/auth/google') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { idToken } = body;
+        if (!idToken || typeof idToken !== 'string') {
+          return jsonResp({ success: false, error: 'ID token required' }, 400, origin);
+        }
+
+        // Verify Google ID token
+        let googlePayload;
+        try {
+          const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+          if (!verifyRes.ok) {
+            return jsonResp({ success: false, error: 'Invalid Google token' }, 401, origin);
+          }
+          googlePayload = await verifyRes.json();
+        } catch (e) {
+          return jsonResp({ success: false, error: 'Failed to verify Google token' }, 500, origin);
+        }
+
+        // Validate audience
+        const GOOGLE_CLIENT_ID = '161775002744-llru57d8q7f8i8d5vevns0ogk0eecpm9.apps.googleusercontent.com';
+        if (googlePayload.aud !== GOOGLE_CLIENT_ID) {
+          return jsonResp({ success: false, error: 'Invalid token audience' }, 401, origin);
+        }
+        if (googlePayload.iss !== 'https://accounts.google.com' && googlePayload.iss !== 'accounts.google.com') {
+          return jsonResp({ success: false, error: 'Invalid token issuer' }, 401, origin);
+        }
+
+        const googleId = googlePayload.sub;
+        const googleEmail = googlePayload.email || '';
+
+        // Find account by googleId
+        let account = null;
+        let accountKey = null;
+        for (const [key, acc] of accounts) {
+          if (acc.googleId === googleId) {
+            account = acc;
+            accountKey = key;
+            break;
+          }
+        }
+
+        // If not found by googleId, create new account
+        if (!account) {
+          // Generate a username from email or a random one
+          let baseUsername = googleEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+          if (!baseUsername || baseUsername.length < 2) {
+            baseUsername = 'farmer' + Math.random().toString(36).substr(2, 5);
+          }
+          let username = baseUsername;
+          let suffix = 1;
+          while (accounts.has(username)) {
+            username = baseUsername + suffix;
+            suffix++;
+          }
+
+          let playerId;
+          do {
+            playerId = generatePlayerId();
+          } while (players.has(playerId));
+
+          const now = Date.now();
+          const state = createDefaultPlayerState(playerId, username, now);
+          players.set(playerId, state);
+
+          account = { username, playerId, googleId, googleEmail };
+          accounts.set(username, account);
+          accountKey = username;
+
+          await Promise.all([savePlayer(playerId, state), saveAccounts()]);
+        }
+
+        const state = players.get(account.playerId);
+        applyGrowthTicks(state, Date.now(), true);
+
+        const now = Date.now();
+        const newToken = generateSessionToken();
+        sessions.set(newToken, { playerId: account.playerId, createdAt: now, lastUsedAt: now, expiresAt: now + SESSION_EXPIRY_MS });
+        debouncedSaveSessions();
+
+        return jsonResp({ success: true, state, token: newToken, mode: GAME_MODE, username: account.username }, 200, origin);
+      }
+
+      // --- Google OAuth Link ---
+      if (path === '/api/auth/google/link') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { idToken } = body;
+        if (!idToken || typeof idToken !== 'string') {
+          return jsonResp({ success: false, error: 'ID token required' }, 400, origin);
+        }
+
+        // Verify Google ID token
+        let googlePayload;
+        try {
+          const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+          if (!verifyRes.ok) {
+            return jsonResp({ success: false, error: 'Invalid Google token' }, 401, origin);
+          }
+          googlePayload = await verifyRes.json();
+        } catch (e) {
+          return jsonResp({ success: false, error: 'Failed to verify Google token' }, 500, origin);
+        }
+
+        const GOOGLE_CLIENT_ID = '161775002744-llru57d8q7f8i8d5vevns0ogk0eecpm9.apps.googleusercontent.com';
+        if (googlePayload.aud !== GOOGLE_CLIENT_ID) {
+          return jsonResp({ success: false, error: 'Invalid token audience' }, 401, origin);
+        }
+
+        const googleId = googlePayload.sub;
+        const googleEmail = googlePayload.email || '';
+
+        // Check if this googleId is already linked to another account
+        for (const [key, acc] of accounts) {
+          if (acc.googleId === googleId && key !== state.playerName.trim().toLowerCase()) {
+            return jsonResp({ success: false, error: 'This Google account is already linked to another user' }, 409, origin);
+          }
+        }
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        account.googleId = googleId;
+        account.googleEmail = googleEmail;
+        await saveAccounts();
+
+        return jsonResp({ success: true, email: googleEmail }, 200, origin);
+      }
+
+      // --- Google OAuth Unlink ---
+      if (path === '/api/auth/google/unlink') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        if (!account.googleId) {
+          return jsonResp({ success: false, error: 'Google account not linked' }, 400, origin);
+        }
+
+        delete account.googleId;
+        delete account.googleEmail;
+        await saveAccounts();
+
+        return jsonResp({ success: true }, 200, origin);
+      }
+
+      // --- Google OAuth Status ---
+      if (path === '/api/auth/google/status') {
+        if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        return jsonResp({ success: true, linked: !!account.googleId, email: account.googleEmail || null }, 200, origin);
+      }
+
+      // --- 2FA Verify (completes login) ---
+      if (path === '/api/2fa/verify') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { tempToken, code } = body;
+        if (!tempToken || !code) return jsonResp({ success: false, error: 'Token and code required' }, 400, origin);
+
+        const pending = totpPending.get(tempToken);
+        if (!pending || Date.now() > pending.expiresAt) {
+          totpPending.delete(tempToken);
+          return jsonResp({ success: false, error: 'Session expired. Please login again.' }, 401, origin);
+        }
+
+        const account = accounts.get(pending.username);
+        if (!account || !account.totpSecret) {
+          totpPending.delete(tempToken);
+          return jsonResp({ success: false, error: '2FA not configured' }, 400, origin);
+        }
+
+        if (!(await verifyTOTP(account.totpSecret, code))) {
+          return jsonResp({ success: false, error: 'Invalid code' }, 401, origin);
+        }
+
+        totpPending.delete(tempToken);
         const state = players.get(account.playerId);
         applyGrowthTicks(state, Date.now(), true);
 
@@ -804,6 +1139,126 @@ async function handleRequest(req) {
         return jsonResp({ publicKey: VAPID_PUBLIC_KEY }, 200, origin);
       }
 
+      // --- Change Password ---
+      if (path === '/api/change-password') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { currentPassword, newPassword } = body;
+        if (!currentPassword || !newPassword) return jsonResp({ success: false, error: 'Current and new password required' }, 400, origin);
+        if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') return jsonResp({ success: false, error: 'Invalid input types' }, 400, origin);
+        if (newPassword.length < MIN_PASSWORD_LENGTH) return jsonResp({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        const { valid } = await verifyPassword(currentPassword, account.passwordHash);
+        if (!valid) return jsonResp({ success: false, error: 'Current password is incorrect' }, 401, origin);
+
+        account.passwordHash = await hashPasswordPBKDF2(newPassword);
+        await saveAccounts();
+
+        return jsonResp({ success: true }, 200, origin);
+      }
+
+      // --- 2FA Status ---
+      if (path === '/api/2fa/status') {
+        if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        return jsonResp({ success: true, enabled: !!account.totpSecret }, 200, origin);
+      }
+
+      // --- 2FA Setup ---
+      if (path === '/api/2fa/setup') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+
+        const secret = generateTOTPSecret();
+        // Store temporarily (not enabled until verified)
+        account.totpSecretPending = secret;
+        await saveAccounts();
+
+        return jsonResp({ success: true, secret }, 200, origin);
+      }
+
+      // --- 2FA Enable ---
+      if (path === '/api/2fa/enable') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { secret, code } = body;
+        if (!secret || !code) return jsonResp({ success: false, error: 'Secret and code required' }, 400, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+        if (account.totpSecretPending !== secret) return jsonResp({ success: false, error: 'Invalid setup session' }, 400, origin);
+
+        if (!(await verifyTOTP(secret, code))) return jsonResp({ success: false, error: 'Invalid code' }, 400, origin);
+
+        account.totpSecret = secret;
+        delete account.totpSecretPending;
+        await saveAccounts();
+
+        return jsonResp({ success: true }, 200, origin);
+      }
+
+      // --- 2FA Disable ---
+      if (path === '/api/2fa/disable') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const state = getPlayerFromAuth(req.headers.get('authorization'));
+        if (!state) return jsonResp({ success: false, error: 'Unauthorized' }, 401, origin);
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { code } = body;
+        if (!code) return jsonResp({ success: false, error: 'Code required' }, 400, origin);
+
+        const account = accounts.get(state.playerName.trim().toLowerCase());
+        if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
+        if (!account.totpSecret) return jsonResp({ success: false, error: '2FA is not enabled' }, 400, origin);
+
+        if (!(await verifyTOTP(account.totpSecret, code))) return jsonResp({ success: false, error: 'Invalid code' }, 400, origin);
+
+        delete account.totpSecret;
+        delete account.totpSecretPending;
+        await saveAccounts();
+
+        return jsonResp({ success: true }, 200, origin);
+      }
+
       return jsonResp({ error: 'Not found' }, 404, origin);
     }
 
@@ -811,6 +1266,20 @@ async function handleRequest(req) {
     if (path === '/' || path === '/index.html') {
       const file = Bun.file('./index.html');
       return new Response(file, { headers: { 'Content-Type': 'text/html' } });
+    }
+
+    // Public pages
+    if (path === '/privacy-policy' || path === '/privacy-policy.html') {
+      const file = Bun.file('./privacy-policy.html');
+      if (await file.exists()) {
+        return new Response(file, { headers: { 'Content-Type': 'text/html' } });
+      }
+    }
+    if (path === '/terms-of-service' || path === '/terms-of-service.html') {
+      const file = Bun.file('./terms-of-service.html');
+      if (await file.exists()) {
+        return new Response(file, { headers: { 'Content-Type': 'text/html' } });
+      }
     }
 
     // PWA assets
