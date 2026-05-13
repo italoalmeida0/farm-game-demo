@@ -1114,6 +1114,10 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'Google account not linked' }, 400, origin);
         }
 
+        if (!account.passwordHash) {
+          return jsonResp({ success: false, error: 'Set a password before unlinking Google' }, 400, origin);
+        }
+
         delete account.googleId;
         delete account.googleEmail;
         await saveAccounts();
@@ -1288,15 +1292,21 @@ async function handleRequest(req) {
         if (bodyErr) return bodyErr;
 
         const { currentPassword, newPassword } = body;
-        if (!currentPassword || !newPassword) return jsonResp({ success: false, error: 'Current and new password required' }, 400, origin);
-        if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') return jsonResp({ success: false, error: 'Invalid input types' }, 400, origin);
+        if (!newPassword) return jsonResp({ success: false, error: 'New password required' }, 400, origin);
+        if (typeof newPassword !== 'string') return jsonResp({ success: false, error: 'Invalid input types' }, 400, origin);
         if (newPassword.length < MIN_PASSWORD_LENGTH) return jsonResp({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400, origin);
 
         const account = accounts.get(state.playerName.trim().toLowerCase());
         if (!account) return jsonResp({ success: false, error: 'Account not found' }, 404, origin);
 
-        const { valid } = await verifyPassword(currentPassword, account.passwordHash);
-        if (!valid) return jsonResp({ success: false, error: 'Current password is incorrect' }, 401, origin);
+        // If account has a password, currentPassword is required
+        if (account.passwordHash) {
+          if (!currentPassword || typeof currentPassword !== 'string') {
+            return jsonResp({ success: false, error: 'Current password required' }, 400, origin);
+          }
+          const { valid } = await verifyPassword(currentPassword, account.passwordHash);
+          if (!valid) return jsonResp({ success: false, error: 'Current password is incorrect' }, 401, origin);
+        }
 
         account.passwordHash = await hashPasswordPBKDF2(newPassword);
         await saveAccounts();
