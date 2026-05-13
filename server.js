@@ -1660,6 +1660,59 @@ async function handleRequest(req) {
         return jsonResp({ success: true, unbanned: unbannedTargets }, 200, origin);
       }
 
+      // --- Admin: List Users ---
+      if (path === '/api/admin/users') {
+        if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const masterKey = url.searchParams.get('masterKey');
+        if (!masterKey) {
+          return jsonResp({ success: false, error: 'masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+
+        const userList = [];
+        for (const [username, account] of accounts) {
+          // Skip placeholder banned accounts without playerId
+          if (!account.playerId) continue;
+
+          const state = players.get(account.playerId);
+          if (!state) continue;
+
+          const animals = [];
+          if (state.animals) {
+            for (const [type, data] of Object.entries(state.animals)) {
+              if (data) {
+                animals.push({ type, name: data.name || null });
+              }
+            }
+          }
+
+          const warehouse = (state.warehouse || []).map(item => ({
+            itemId: item.itemId,
+            quantity: item.quantity || 1,
+          }));
+
+          userList.push({
+            username,
+            googleLinked: !!(account.googleId || account.googleEmail),
+            email: account.googleEmail || null,
+            has2FA: !!account.totpSecret,
+            level: state.level || 1,
+            xp: state.xp || 0,
+            warehouse,
+            animals,
+          });
+        }
+
+        return jsonResp({ success: true, users: userList }, 200, origin);
+      }
+
       return jsonResp({ error: 'Not found' }, 404, origin);
     }
 

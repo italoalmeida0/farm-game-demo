@@ -19,219 +19,206 @@ export const ActionType = {
 };
 
 // --- Seed Definitions ---
+// Balanced for ~30 days (30h active play) to reach level 12.
+// Key design: XP/min scales with level, profit is sustainable,
+// and each unlock feels meaningful.
 
 export const SEEDS = {
   turnip: {
-    
     name: "Turnip",
-    xpPerHarvest: 6,
-    growTimeMs: 5 * 60_000, // 5 min
-    seedsPerPack: 4,
-    sellPricePerUnit: 6,
-    packCost: 10,
+    xpPerHarvest: 100,
+    growTimeMs: 8 * 60_000, // 8 min
+    seedsPerPack: 10,
+    sellPricePerUnit: 5,
+    packCost: 20,
     requiredLevel: 1,
     emoji: "🟡",
   },
   carrot: {
-    
     name: "Carrot",
-    xpPerHarvest: 5,
-    growTimeMs: 8 * 60_000, // 8 min
-    seedsPerPack: 3,
+    xpPerHarvest: 160,
+    growTimeMs: 12 * 60_000, // 12 min
+    seedsPerPack: 8,
     sellPricePerUnit: 10,
-    packCost: 12,
+    packCost: 30,
     requiredLevel: 1,
     emoji: "🥕",
   },
   tomato: {
-    
     name: "Tomato",
-    xpPerHarvest: 8,
-    growTimeMs: 12 * 60_000, // 12 min
-    seedsPerPack: 3,
-    sellPricePerUnit: 15,
-    packCost: 15,
+    xpPerHarvest: 240,
+    growTimeMs: 15 * 60_000, // 15 min
+    seedsPerPack: 6,
+    sellPricePerUnit: 20,
+    packCost: 45,
     requiredLevel: 1,
     emoji: "🍅",
   },
   cabbage: {
-    
     name: "Cabbage",
-    xpPerHarvest: 35,
+    xpPerHarvest: 600,
     growTimeMs: 30 * 60_000, // 30 min
-    seedsPerPack: 3,
-    sellPricePerUnit: 45,
-    packCost: 30,
+    seedsPerPack: 5,
+    sellPricePerUnit: 50,
+    packCost: 80,
     requiredLevel: 2,
     emoji: "🥬",
   },
   potato: {
-    
     name: "Potato",
-    xpPerHarvest: 40,
+    xpPerHarvest: 1_000,
     growTimeMs: 45 * 60_000, // 45 min
-    seedsPerPack: 3,
-    sellPricePerUnit: 85,
-    packCost: 60,
+    seedsPerPack: 4,
+    sellPricePerUnit: 80,
+    packCost: 120,
     requiredLevel: 3,
     emoji: "🥔",
   },
   rice: {
-    
     name: "Rice",
-    xpPerHarvest: 55,
+    xpPerHarvest: 1_600,
     growTimeMs: 60 * 60_000, // 1h
-    seedsPerPack: 3,
-    sellPricePerUnit: 155,
-    packCost: 100,
+    seedsPerPack: 4,
+    sellPricePerUnit: 140,
+    packCost: 180,
     requiredLevel: 4,
     emoji: "🌾",
   },
-  cucumber: {
-    
-    name: "Cucumber",
-    xpPerHarvest: 90,
-    growTimeMs: 90 * 60_000, // 1h30min
-    seedsPerPack: 2,
-    sellPricePerUnit: 350,
-    packCost: 160,
-    requiredLevel: 5,
-    emoji: "🥒",
-  },
-  strawberry: {
-    
-    name: "Strawberry",
-    xpPerHarvest: 110,
-    growTimeMs: 105 * 60_000, // 1h45min
-    seedsPerPack: 2,
-    sellPricePerUnit: 440,
-    packCost: 180,
-    requiredLevel: 6,
-    emoji: "🍓",
-  },
-  sunflower: {
-    
-    name: "Sunflower",
-    xpPerHarvest: 130,
-    growTimeMs: 120 * 60_000, // 2h
-    seedsPerPack: 2,
-    sellPricePerUnit: 620,
-    packCost: 240,
-    requiredLevel: 7,
-    emoji: "🌻",
-  },
-  pumpkin: {
-    
-    name: "Pumpkin",
-    xpPerHarvest: 220,
-    growTimeMs: 240 * 60_000, // 4h
-    seedsPerPack: 2,
-    sellPricePerUnit: 1600,
-    packCost: 400,
-    requiredLevel: 9,
-    emoji: "🎃",
-  },
   corn: {
-    
     name: "Corn",
-    xpPerHarvest: 70,
-    growTimeMs: 70 * 60_000, // 1h10min
+    xpPerHarvest: 2_400,
+    growTimeMs: 75 * 60_000, // 1h 15min
     seedsPerPack: 3,
-    sellPricePerUnit: 200,
-    packCost: 120,
-    requiredLevel: 4,
+    sellPricePerUnit: 220,
+    packCost: 250,
+    requiredLevel: 5,
     emoji: "🌽",
   },
+  cucumber: {
+    name: "Cucumber",
+    xpPerHarvest: 3_600,
+    growTimeMs: 90 * 60_000, // 1h 30min
+    seedsPerPack: 3,
+    sellPricePerUnit: 320,
+    packCost: 350,
+    requiredLevel: 6,
+    emoji: "🥒",
+  },
   eggplant: {
-    
     name: "Eggplant",
-    xpPerHarvest: 100,
-    growTimeMs: 95 * 60_000, // 1h35min
-    seedsPerPack: 2,
-    sellPricePerUnit: 380,
-    packCost: 170,
-    requiredLevel: 5,
+    xpPerHarvest: 5_000,
+    growTimeMs: 105 * 60_000, // 1h 45min
+    seedsPerPack: 3,
+    sellPricePerUnit: 450,
+    packCost: 480,
+    requiredLevel: 7,
     emoji: "🍆",
   },
-  bell_pepper: {
-    
-    name: "Bell Pepper",
-    xpPerHarvest: 120,
-    growTimeMs: 110 * 60_000, // 1h50min
+  strawberry: {
+    name: "Strawberry",
+    xpPerHarvest: 7_000,
+    growTimeMs: 120 * 60_000, // 2h
     seedsPerPack: 2,
-    sellPricePerUnit: 500,
-    packCost: 210,
-    requiredLevel: 6,
+    sellPricePerUnit: 600,
+    packCost: 650,
+    requiredLevel: 8,
+    emoji: "🍓",
+  },
+  bell_pepper: {
+    name: "Bell Pepper",
+    xpPerHarvest: 10_000,
+    growTimeMs: 150 * 60_000, // 2h 30min
+    seedsPerPack: 2,
+    sellPricePerUnit: 850,
+    packCost: 900,
+    requiredLevel: 9,
     emoji: "🫑",
   },
-  watermelon: {
-    
-    name: "Watermelon",
-    xpPerHarvest: 180,
+  sunflower: {
+    name: "Sunflower",
+    xpPerHarvest: 14_000,
     growTimeMs: 180 * 60_000, // 3h
     seedsPerPack: 2,
-    sellPricePerUnit: 1000,
-    packCost: 300,
-    requiredLevel: 8,
+    sellPricePerUnit: 1_200,
+    packCost: 1_200,
+    requiredLevel: 10,
+    emoji: "🌻",
+  },
+  watermelon: {
+    name: "Watermelon",
+    xpPerHarvest: 20_000,
+    growTimeMs: 240 * 60_000, // 4h
+    seedsPerPack: 2,
+    sellPricePerUnit: 1_900,
+    packCost: 1_800,
+    requiredLevel: 11,
     emoji: "🍉",
   },
-  grape: {
-    
-    name: "Grape",
-    xpPerHarvest: 200,
-    growTimeMs: 210 * 60_000, // 3h30min
+  pumpkin: {
+    name: "Pumpkin",
+    xpPerHarvest: 30_000,
+    growTimeMs: 300 * 60_000, // 5h
     seedsPerPack: 2,
-    sellPricePerUnit: 1300,
-    packCost: 350,
-    requiredLevel: 9,
+    sellPricePerUnit: 3_000,
+    packCost: 2_500,
+    requiredLevel: 12,
+    emoji: "🎃",
+  },
+  grape: {
+    name: "Grape",
+    xpPerHarvest: 24_000,
+    growTimeMs: 240 * 60_000, // 4h
+    seedsPerPack: 2,
+    sellPricePerUnit: 2_400,
+    packCost: 2_000,
+    requiredLevel: 12,
     emoji: "🍇",
   },
 };
 
 // --- Animal Definitions ---
+// Rebalanced: each animal is a meaningful investment.
+// Sheep is now properly gated and rewarding.
 
 export const ANIMALS = {
   chicken: {
-    
     name: "Chicken",
-    cost: 500,
-    growTimeMs: 2 * 60 * 60_000, // 2h to become adult
-    productionTimeMs: 5 * 60_000, // 5min per egg
+    cost: 3_000,
+    growTimeMs: 6 * 60 * 60_000, // 6h to become adult
+    productionTimeMs: 60 * 60_000, // 1h per egg
     productId: "egg",
     productName: "Egg",
-    productSellPrice: 25,
+    productSellPrice: 80,
     productEmoji: "🥚",
     animalEmoji: "🐔",
-    requiredLevel: 1,
-    xpPerCollect: 10,
+    requiredLevel: 2,
+    xpPerCollect: 30,
   },
   cow: {
-    
     name: "Cow",
-    cost: 1500,
-    growTimeMs: 4 * 60 * 60_000, // 4h to become adult
-    productionTimeMs: 6 * 60_000, // 6min per milk
+    cost: 8_000,
+    growTimeMs: 12 * 60 * 60_000, // 12h to become adult
+    productionTimeMs: 90 * 60_000, // 1h 30min per milk
     productId: "milk",
     productName: "Milk",
-    productSellPrice: 50,
+    productSellPrice: 180,
     productEmoji: "🥛",
     animalEmoji: "🐄",
-    requiredLevel: 2,
-    xpPerCollect: 20,
+    requiredLevel: 5,
+    xpPerCollect: 60,
   },
   sheep: {
-    
     name: "Sheep",
-    cost: 3500,
-    growTimeMs: 6 * 60 * 60_000, // 6h to become adult
-    productionTimeMs: 7 * 60_000, // 7min per wool
+    cost: 25_000,
+    growTimeMs: 18 * 60 * 60_000, // 18h to become adult
+    productionTimeMs: 2 * 60 * 60_000, // 2h per wool
     productId: "wool",
     productName: "Wool",
-    productSellPrice: 70,
+    productSellPrice: 350,
     productEmoji: "🧶",
     animalEmoji: "🐑",
-    requiredLevel: 8,
-    xpPerCollect: 30,
+    requiredLevel: 9,
+    xpPerCollect: 100,
   },
 };
 
@@ -249,39 +236,41 @@ for (const [id, seed] of Object.entries(SEEDS)) {
 }
 
 // Add animal products
-WAREHOUSE_ITEMS.egg = { name: "Egg", sellPrice: 25, emoji: "🥚" };
-WAREHOUSE_ITEMS.milk = { name: "Milk", sellPrice: 50, emoji: "🥛" };
-WAREHOUSE_ITEMS.wool = { name: "Wool", sellPrice: 70, emoji: "🧶" };
+WAREHOUSE_ITEMS.egg = { name: "Egg", sellPrice: 80, emoji: "🥚" };
+WAREHOUSE_ITEMS.milk = { name: "Milk", sellPrice: 180, emoji: "🥛" };
+WAREHOUSE_ITEMS.wool = { name: "Wool", sellPrice: 350, emoji: "🧶" };
 
 // --- Animal Feed ---
 
-export const FEED_COST = 20;
+export const FEED_COST = 30;
 export const FEED_NAME = "Animal Feed";
 
 // --- Level XP thresholds (cumulative XP needed to reach each level) ---
+// Target: ~30 days at 1h/day active play to reach level 12.
+// Total XP required: 350,000.
 
 export const XP_PER_LEVEL = [
-  0, // level 1 (starting)
-  100, // level 2
-  300, // level 3
-  600, // level 4
-  1100, // level 5
-  1800, // level 6
-  2800, // level 7
-  4200, // level 8
-  6000, // level 9
-  8500, // level 10
-  12000, // level 11
-  17000, // level 12
+  0,       // level 1 (starting)
+  4_000,   // level 2
+  12_000,  // level 3
+  30_000,  // level 4
+  65_000,  // level 5
+  120_000, // level 6
+  200_000, // level 7
+  310_000, // level 8
+  450_000, // level 9
+  620_000, // level 10
+  830_000, // level 11
+  1_100_000, // level 12
 ];
 
 // --- Slot unlock costs (each slot is more expensive) ---
+// Smoother scaling than before.
 
 export function getSlotUnlockCost(currentUnlocked) {
-  // Base cost starts at 100 and increases proportionally
   // Slots 1-6 are free (initial), 7th slot onwards costs gold
   const slotIndex = currentUnlocked - INITIAL_UNLOCKED_SLOTS; // 0-based for paid slots
-  return Math.floor(200 * Math.pow(1.4, slotIndex));
+  return Math.floor(300 * Math.pow(1.3, slotIndex));
 }
 
 export const INITIAL_UNLOCKED_SLOTS = 6;
@@ -301,13 +290,13 @@ export const MIN_PLAYER_NAME_LENGTH = 2;
 // --- Mode-dependent config ---
 
 export const DEV_MODE = {
-  SYNC_INTERVAL_MS: 5_000,        // sync every 3s
-  STARTING_COINS: 5000,            // generous starting money
-  DRY_INTERVAL_MS: 30_000,         // soil dries every 30s
-  PEST_CHECK_INTERVAL_MS: 20_000,  // pests can appear every 20s
-  PEST_HEALTH_DRAIN_PER_MIN: 10,   // fast health drain
-  PESTICIDE_DURATION_MS: 60_000,   // pesticide lasts 1 min
-  PEST_APPEAR_CHANCE: 0.6,         // 60% chance per check
+  SYNC_INTERVAL_MS: 5_000,        // sync every 5s
+  STARTING_COINS: 5_000,          // generous starting money
+  DRY_INTERVAL_MS: 30_000,        // soil dries every 30s
+  PEST_CHECK_INTERVAL_MS: 20_000, // pests can appear every 20s
+  PEST_HEALTH_DRAIN_PER_MIN: 10,  // fast health drain
+  PESTICIDE_DURATION_MS: 60_000,  // pesticide lasts 1 min
+  PEST_APPEAR_CHANCE: 0.6,        // 60% chance per check
   SEED_GROW_MULTIPLIER: 0.05,
   SELL_MULTIPLIER: 10,
   BUY_MULTIPLIER: 0.2,
@@ -315,12 +304,12 @@ export const DEV_MODE = {
 
 export const PROD_MODE = {
   SYNC_INTERVAL_MS: 5_000,
-  STARTING_COINS: 100,
-  DRY_INTERVAL_MS: 10 * 60_000,    // soil dries every 10 min
-  PEST_CHECK_INTERVAL_MS: 15 * 60_000, // pests every 15 min
-  PEST_HEALTH_DRAIN_PER_MIN: 2,
+  STARTING_COINS: 3_000,           // increased to help early-game sustainability
+  DRY_INTERVAL_MS: 15 * 60_000,    // soil dries every 15 min (was 10)
+  PEST_CHECK_INTERVAL_MS: 10 * 60_000, // pests every 10 min (was 15)
+  PEST_HEALTH_DRAIN_PER_MIN: 5,    // faster drain (was 2)
   PESTICIDE_DURATION_MS: 30 * 60_000,  // 30 min
-  PEST_APPEAR_CHANCE: 0.15,            // 15% chance
+  PEST_APPEAR_CHANCE: 0.25,        // 25% chance (was 15%)
   SEED_GROW_MULTIPLIER: 1,
   SELL_MULTIPLIER: 1,
   BUY_MULTIPLIER: 1,
