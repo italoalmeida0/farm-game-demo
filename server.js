@@ -223,7 +223,6 @@ const REG_RATE_LIMIT_MAX = 3;
 const usedTOTPCodes = new Map(); // code+secretHash -> usedAt
 const TOTP_CODE_TTL = 90_000; // 90s window
 
-const usedGoogleTokens = new Map(); // idToken -> usedAt
 const GOOGLE_TOKEN_TTL = 65 * 60 * 1000; // 65 minutes (Google tokens expire ~1h)
 
 const LOCK_TTL_MS = 10_000;
@@ -934,11 +933,6 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'ID token required' }, 400, origin);
         }
 
-        // AUDIT-023: Anti-replay for Google ID tokens
-        if (usedGoogleTokens.has(idToken)) {
-          return jsonResp({ success: false, error: 'Token has already been used' }, 401, origin);
-        }
-
         // Verify Google ID token
         let googlePayload;
         try {
@@ -969,9 +963,6 @@ async function handleRequest(req) {
         if (bannedEmails.has(googleEmail)) {
           return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
         }
-
-        // Mark token as used after successful verification
-        usedGoogleTokens.set(idToken, Date.now());
 
         // Find account by googleId
         let account = null;
