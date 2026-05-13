@@ -1082,9 +1082,6 @@
           font-size: 11px;
           gap: 3px;
         }
-        #sync-status {
-          display: none;
-        }
 
         .main-area {
           flex-direction: row;
@@ -1868,12 +1865,6 @@
           >
             ⚙️
           </button>
-          <span
-            style="font-size: 12px; color: var(--text-dark)"
-            id="sync-status"
-            >Ready</span
-          >
-          <div class="sync-indicator" id="sync-indicator"></div>
         </div>
       </div>
 
@@ -2939,7 +2930,6 @@
 
         // Sync any pending actions before logout
         if (authToken && walBuffer.length > 0) {
-          setSyncStatus("syncing");
           try {
             await syncWithServer();
           } catch (e) {
@@ -3176,7 +3166,6 @@
 
         // Sync first
         if (authToken && walBuffer.length > 0) {
-          setSyncStatus("syncing");
           try {
             await syncWithServer();
           } catch (e) {
@@ -4043,30 +4032,6 @@
 
       // syncWithServer is defined below (with disconnect overlay support)
 
-      function setSyncStatus(status) {
-        const indicator = document.getElementById("sync-indicator");
-        const text = document.getElementById("sync-status");
-        indicator.className = "sync-indicator";
-        switch (status) {
-          case "syncing":
-            indicator.classList.add("syncing");
-            text.textContent = "Syncing...";
-            break;
-          case "ok":
-            text.textContent = ``;
-            break;
-          case "error":
-            indicator.classList.add("error");
-            text.textContent = "Sync error";
-            break;
-          case "retrying":
-            indicator.classList.add("syncing");
-            text.textContent = "Retrying...";
-            break;
-          default:
-            text.textContent = "Ready";
-        }
-      }
 
       // ============================================================
       // NOTIFICATIONS & PARTICLES
@@ -4603,7 +4568,6 @@
             gameState = data.state;
             updateGameMode(data.mode);
             hideDisconnectOverlay();
-            setSyncStatus("ok");
             renderAll();
             notify("Reconnected! 🎉", "success");
           }
@@ -4629,8 +4593,6 @@
         };
         walBuffer = [];
 
-        setSyncStatus("syncing");
-
         try {
           const res = await fetch(`${API_BASE}/api/sync`, {
             method: "POST",
@@ -4645,7 +4607,6 @@
 
           if (res.status === 423) {
             walBuffer = [...pendingWal.actions, ...walBuffer];
-            setSyncStatus("retrying");
             pendingWal = null;
             return;
           }
@@ -4655,7 +4616,6 @@
             gameState = data.state;
             disconnectCount = 0;
             if (isDisconnected) hideDisconnectOverlay();
-            setSyncStatus("ok");
             if (data.rejectedActions && data.rejectedActions.length > 0) {
               for (const rej of data.rejectedActions) {
                 notify(`Server rejected #${rej.index}: ${rej.reason}`, "error");
@@ -4664,7 +4624,6 @@
             renderAll();
           } else {
             walBuffer = [...pendingWal.actions, ...walBuffer];
-            setSyncStatus("error");
             disconnectCount++;
             if (disconnectCount >= 2 && !isDisconnected)
               showDisconnectOverlay();
@@ -4672,7 +4631,6 @@
           }
         } catch (err) {
           walBuffer = [...pendingWal.actions, ...walBuffer];
-          setSyncStatus("error");
           disconnectCount++;
           if (disconnectCount >= 2 && !isDisconnected) showDisconnectOverlay();
           console.warn("Sync failed:", err);
