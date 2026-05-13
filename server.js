@@ -1635,9 +1635,16 @@ async function handleRequest(req) {
           const account = accounts.get(trimmed);
           if (account) {
             if (account.banned) {
-              delete account.banned;
-              unbannedTargets.push(trimmed);
-              console.log(`[ADMIN] Unbanned user "${trimmed}"`);
+              // If this is a placeholder banned account (no playerId), remove it entirely
+              if (!account.playerId) {
+                accounts.delete(trimmed);
+                unbannedTargets.push(trimmed);
+                console.log(`[ADMIN] Removed placeholder banned account "${trimmed}"`);
+              } else {
+                delete account.banned;
+                unbannedTargets.push(trimmed);
+                console.log(`[ADMIN] Unbanned user "${trimmed}"`);
+              }
             }
           }
         }
@@ -1761,6 +1768,100 @@ async function handleRequest(req) {
           bannedUsernames: bannedUsernames.slice(offset, offset + limit),
           bannedEmails: allEmails.slice(offset, offset + limit),
         }, 200, origin);
+      }
+
+      // --- Admin: Reset Password ---
+      if (path === '/api/admin/reset-password') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, newPassword, masterKey } = body;
+        if (!username || !newPassword || !masterKey) {
+          return jsonResp({ success: false, error: 'Username, newPassword and masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+        if (newPassword.length < MIN_PASSWORD_LENGTH) {
+          return jsonResp({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400, origin);
+        }
+
+        const trimmed = username.trim().toLowerCase();
+        const account = accounts.get(trimmed);
+        if (!account) {
+          return jsonResp({ success: false, error: 'User not found' }, 404, origin);
+        }
+
+        account.passwordHash = await hashPasswordPBKDF2(newPassword);
+        await saveAccounts();
+
+        // Invalidate all sessions for this player
+        let sessionsInvalidated = 0;
+        for (const [token, session] of sessions) {
+          if (session.playerId === account.playerId) {
+            sessions.delete(token);
+            sessionsInvalidated++;
+          }
+        }
+        if (sessionsInvalidated > 0) {
+          debouncedSaveSessions();
+        }
+
+        console.log(`[ADMIN] Reset password for "${trimmed}", sessions invalidated: ${sessionsInvalidated}`);
+        return jsonResp({ success: true, username: trimmed, sessionsInvalidated }, 200, origin);
+      }
+
+      // --- Admin: Disable 2FA ---
+      if (path === '/api/admin/disable-2fa') {
+        if (method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const ctErr = validateContentType(req, origin);
+        if (ctErr) return ctErr;
+        const clErr = validateContentLength(req, MAX_BODY_AUTH, origin);
+        if (clErr) return clErr;
+
+        const { data: body, error: bodyErr } = await parseJsonBody(req);
+        if (bodyErr) return bodyErr;
+
+        const { username, masterKey } = body;
+        if (!username || !masterKey) {
+          return jsonResp({ success: false, error: 'Username and masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+
+        const trimmed = username.trim().toLowerCase();
+        const account = accounts.get(trimmed);
+        if (!account) {
+          return jsonResp({ success: false, error: 'User not found' }, 404, origin);
+        }
+
+        if (!account.totpSecret && !account.totpSecretPending) {
+          return jsonResp({ success: false, error: '2FA is not enabled for this user' }, 400, origin);
+        }
+
+        delete account.totpSecret;
+        delete account.totpSecretPending;
+        await saveAccounts();
+
+        console.log(`[ADMIN] Disabled 2FA for "${trimmed}"`);
+        return jsonResp({ success: true, username: trimmed }, 200, origin);
       }
 
       return jsonResp({ error: 'Not found' }, 404, origin);

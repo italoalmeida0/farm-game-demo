@@ -329,6 +329,36 @@
       </div>
     </div>
 
+    <!-- Reset Password -->
+    <div class="panel">
+      <div class="panel-header">Reset Password</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reset-username" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="text" id="reset-password" placeholder="min 6 characters">
+        </div>
+        <button class="btn btn-primary" onclick="resetPassword()">Reset Password</button>
+        <div id="reset-response" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- Disable 2FA -->
+    <div class="panel">
+      <div class="panel-header">Disable 2FA</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="disable2fa-username" placeholder="username">
+        </div>
+        <button class="btn btn-danger" onclick="disable2FA()">Disable 2FA</button>
+        <div id="disable2fa-response" class="response-box"></div>
+      </div>
+    </div>
+
     <!-- Ban -->
     <div class="panel">
       <div class="panel-header">Ban</div>
@@ -534,6 +564,31 @@
         showResponse('delete', data, data.success ? 'success' : 'error');
         if (data.success) document.getElementById('delete-username').value = '';
       } catch (err) { showResponse('delete', 'Error: ' + err.message, 'error'); }
+    }
+
+    async function resetPassword() {
+      const username = document.getElementById('reset-username').value.trim();
+      const newPassword = document.getElementById('reset-password').value;
+      if (!username || !newPassword) { showResponse('reset', 'Username and new password required', 'error'); return; }
+      try {
+        const data = await apiPost('/api/admin/reset-password', { username, newPassword });
+        showResponse('reset', data, data.success ? 'success' : 'error');
+        if (data.success) {
+          document.getElementById('reset-username').value = '';
+          document.getElementById('reset-password').value = '';
+        }
+      } catch (err) { showResponse('reset', 'Error: ' + err.message, 'error'); }
+    }
+
+    async function disable2FA() {
+      const username = document.getElementById('disable2fa-username').value.trim();
+      if (!username) { showResponse('disable2fa', 'Username required', 'error'); return; }
+      if (!confirm(`Disable 2FA for user "${username}"?`)) return;
+      try {
+        const data = await apiPost('/api/admin/disable-2fa', { username });
+        showResponse('disable2fa', data, data.success ? 'success' : 'error');
+        if (data.success) document.getElementById('disable2fa-username').value = '';
+      } catch (err) { showResponse('disable2fa', 'Error: ' + err.message, 'error'); }
     }
 
     async function banUser() {
