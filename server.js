@@ -1677,6 +1677,9 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
         }
 
+        const offset = Math.max(0, parseInt(url.searchParams.get('offset'), 10) || 0);
+        const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
+
         const userList = [];
         for (const [username, account] of accounts) {
           // Skip placeholder banned accounts without playerId
@@ -1701,6 +1704,7 @@ async function handleRequest(req) {
 
           userList.push({
             username,
+            banned: !!account.banned,
             googleLinked: !!(account.googleId || account.googleEmail),
             email: account.googleEmail || null,
             has2FA: !!account.totpSecret,
@@ -1711,7 +1715,52 @@ async function handleRequest(req) {
           });
         }
 
-        return jsonResp({ success: true, users: userList }, 200, origin);
+        const total = userList.length;
+        const paginated = userList.slice(offset, offset + limit);
+
+        return jsonResp({ success: true, total, offset, limit, users: paginated }, 200, origin);
+      }
+
+      // --- Admin: Banned List ---
+      if (path === '/api/admin/banned-list') {
+        if (method !== 'GET') return jsonResp({ error: 'Method not allowed' }, 405, origin);
+
+        if (!MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Admin operations are not configured on this server' }, 503, origin);
+        }
+
+        const masterKey = url.searchParams.get('masterKey');
+        if (!masterKey) {
+          return jsonResp({ success: false, error: 'masterKey required' }, 400, origin);
+        }
+        if (masterKey !== MASTER_KEY) {
+          return jsonResp({ success: false, error: 'Invalid master key' }, 403, origin);
+        }
+
+        const offset = Math.max(0, parseInt(url.searchParams.get('offset'), 10) || 0);
+        const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 50));
+
+        const bannedUsernames = [];
+        for (const [username, account] of accounts) {
+          if (account.banned) {
+            bannedUsernames.push(username);
+          }
+        }
+
+        const allEmails = Array.from(bannedEmails);
+
+        const totalUsernames = bannedUsernames.length;
+        const totalEmails = allEmails.length;
+
+        return jsonResp({
+          success: true,
+          totalUsernames,
+          totalEmails,
+          offset,
+          limit,
+          bannedUsernames: bannedUsernames.slice(offset, offset + limit),
+          bannedEmails: allEmails.slice(offset, offset + limit),
+        }, 200, origin);
       }
 
       return jsonResp({ error: 'Not found' }, 404, origin);
