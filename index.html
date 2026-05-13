@@ -352,8 +352,9 @@
         -webkit-tap-highlight-color: transparent;
         z-index: 10;
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 24px;
+        right: 24px;
+        pointer-events: auto;
       }
       .fullscreen-btn:hover {
         background: var(--btn-hover);
@@ -909,8 +910,8 @@
       .action-bar {
         display: flex;
         gap: 8px;
-        padding: 12px;
-        padding-bottom: 16px;
+        padding: 8px;
+        padding-bottom: 20px;
         background: var(--panel);
         border-top: 2px solid var(--panel-border);
         justify-content: center;
@@ -3926,21 +3927,80 @@
 
       // Attach fullscreen handler directly to avoid inline onclick reference error
       const fullscreenBtn = document.getElementById("fullscreen-btn");
+
+      function isFullscreenActive() {
+        return !!(
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement
+        );
+      }
+
+      function enterFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+          return el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+          return el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+          return el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+          return el.msRequestFullscreen();
+        }
+        return Promise.reject(new Error("Fullscreen API not supported"));
+      }
+
+      function exitFullscreen() {
+        if (document.exitFullscreen) {
+          return document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          return document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          return document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          return document.msExitFullscreen();
+        }
+        return Promise.reject(new Error("Fullscreen API not supported"));
+      }
+
+      // iOS Safari fallback: expand to fill viewport and hide browser chrome via scroll
+      function activateIosFallback() {
+        window.scrollTo(0, 0);
+        document.body.style.height = "100vh";
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.height = "100vh";
+        document.documentElement.style.overflow = "hidden";
+        // Try to hide Safari chrome by scrolling after a short delay
+        setTimeout(() => window.scrollTo(0, 1), 100);
+      }
+
       if (fullscreenBtn) {
         fullscreenBtn.addEventListener("click", () => {
-          if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
+          if (!isFullscreenActive()) {
+            enterFullscreen().catch(() => {
+              // Fallback for iOS and other browsers without fullscreen API
+              if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                activateIosFallback();
+              }
+            });
           } else {
-            document.exitFullscreen().catch(() => {});
+            exitFullscreen().catch(() => {});
           }
         });
       }
-      document.addEventListener("fullscreenchange", () => {
+
+      function updateFullscreenBtnTitle() {
         const btn = document.getElementById("fullscreen-btn");
         if (btn) {
-          btn.title = document.fullscreenElement ? "Exit Fullscreen" : "Enter Fullscreen";
+          btn.title = isFullscreenActive() ? "Exit Fullscreen" : "Enter Fullscreen";
         }
-      });
+      }
+
+      document.addEventListener("fullscreenchange", updateFullscreenBtnTitle);
+      document.addEventListener("webkitfullscreenchange", updateFullscreenBtnTitle);
+      document.addEventListener("mozfullscreenchange", updateFullscreenBtnTitle);
+      document.addEventListener("MSFullscreenChange", updateFullscreenBtnTitle);
 
       // ============================================================
       // WAL SYNC ENGINE
