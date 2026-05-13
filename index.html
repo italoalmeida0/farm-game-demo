@@ -1813,7 +1813,7 @@
       <div class="top-bar">
         <div class="stats">
           <div class="stat">
-            <span class="icon">🪙</span>
+            <span class="icon">💰</span>
             <span class="value" id="coins-display">100</span>
           </div>
           <div class="stat">
@@ -3582,7 +3582,7 @@
               ),
             );
             el.className = "farm-slot locked";
-            el.innerHTML = `<span class="slot-crop">🔒</span><span class="slot-lock-text">🪙${cost}</span>`;
+            el.innerHTML = `<span class="slot-crop">🔒</span><span class="slot-lock-text">💰${cost}</span>`;
             return;
           }
 
@@ -3697,14 +3697,14 @@
           <span class="item-icon">${def.emoji}</span>
           <div class="item-info">
             <div class="item-name">${def.name}</div>
-            <div class="item-qty">x${item.quantity} • 🪙${unitPrice} each</div>
+            <div class="item-qty">x${item.quantity} • 💰${unitPrice} each</div>
           </div>
           <div class="item-actions">
-            <button class="item-btn sell" onclick="sellItem('${item.itemId}')">Sell 🪙${unitPrice}</button>
+            <button class="item-btn sell" onclick="sellItem('${item.itemId}')">Sell 💰${unitPrice}</button>
           </div>
         </div>`;
         }
-        html += `<button class="sell-all-btn" onclick="sellAll()">💰 Sell Everything — 🪙${totalSellValue}</button>`;
+        html += `<button class="sell-all-btn" onclick="sellAll()">💰 Sell Everything — 💰${totalSellValue}</button>`;
         panel.innerHTML = html;
       }
 
@@ -3718,7 +3718,7 @@
         <div class="item-info">
           <div class="item-name">Animal Feed</div>
           <div class="item-detail">Feed your animals</div>
-          <div class="item-price">🪙 ${Math.max(1, Math.floor(FEED_COST * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
+          <div class="item-price">💰 ${Math.max(1, Math.floor(FEED_COST * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
         </div>
         <button class="buy-btn" onclick="buyItem('feed')" ${gameState.coins < Math.max(1, Math.floor(FEED_COST * globalThis.GAME_CONFIG.BUY_MULTIPLIER)) ? "disabled" : ""}>Buy</button>
       </div>`;
@@ -3746,8 +3746,8 @@
           <span class="item-icon">${seed.emoji}</span>
           <div class="item-info">
             <div class="item-name">${seed.name} ${locked ? `<span class="locked-badge">🔒 Lv${seed.requiredLevel}</span>` : ""}</div>
-            <div class="item-detail">${seed.seedsPerPack} seeds • ${formatTimeShort(Math.floor(seed.growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER))} • +${seed.xpPerHarvest} XP • Sells: 🪙${totalSell}</div>
-            <div class="item-price">🪙 ${Math.max(1, Math.floor(seed.packCost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
+            <div class="item-detail">${seed.seedsPerPack} seeds • ${formatTimeShort(Math.floor(seed.growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER))} • +${seed.xpPerHarvest} XP • Sells: 💰${totalSell}</div>
+            <div class="item-price">💰 ${Math.max(1, Math.floor(seed.packCost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
           </div>
           <button class="buy-btn" onclick="buyItem('${id}')" ${canBuy ? "" : "disabled"}>Buy</button>
         </div>`;
@@ -3770,7 +3770,7 @@
           <div class="item-info">
             <div class="item-name">${def.name} ${locked ? `<span class="locked-badge">🔒 Lv${def.requiredLevel}</span>` : ""} ${owned ? '<span class="locked-badge">✅ Owned</span>' : ""}</div>
             <div class="item-detail">Adult: ${Math.floor(def.growTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER) / 3600000}h • ${def.productName} every ${Math.floor(def.productionTimeMs * globalThis.GAME_CONFIG.SEED_GROW_MULTIPLIER) / 60000}min • +${def.xpPerCollect} XP</div>
-            <div class="item-price">🪙 ${Math.max(1, Math.floor(def.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
+            <div class="item-price">💰 ${Math.max(1, Math.floor(def.cost * globalThis.GAME_CONFIG.BUY_MULTIPLIER))}</div>
           </div>
           <button class="buy-btn" onclick="buyAnimal('${id}')" ${canBuy ? "" : "disabled"}>Buy</button>
         </div>`;
@@ -3862,7 +3862,7 @@
         }
         walBuffer.push(action);
         notify(
-          `Sold ${WAREHOUSE_ITEMS[itemId].name} for 🪙${Math.max(1, Math.floor(WAREHOUSE_ITEMS[itemId].sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))}!`,
+          `Sold ${WAREHOUSE_ITEMS[itemId].name} for 💰${Math.max(1, Math.floor(WAREHOUSE_ITEMS[itemId].sellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))}!`,
           "success",
         );
         renderAll();
@@ -4414,7 +4414,7 @@
         } else if (animal.productReady) {
           statusHTML = `
           <div class="tip-row"><span class="tip-label">Status:</span> <span class="tip-value">${def.productEmoji} Ready!</span></div>
-          <div class="tip-row"><span class="tip-label">Product:</span> <span class="tip-value">${def.productName} (🪙${Math.max(1, Math.floor(def.productSellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))})</span></div>
+          <div class="tip-row"><span class="tip-label">Product:</span> <span class="tip-value">${def.productName} (💰${Math.max(1, Math.floor(def.productSellPrice * globalThis.GAME_CONFIG.SELL_MULTIPLIER))})</span></div>
         `;
           actionsHTML = `<button class="tip-btn collect" onclick="collectAnimal('${animalId}');">Collect ${def.productEmoji}</button>`;
         } else if (animal.isProducing && animal.producingAt) {
@@ -4537,7 +4537,7 @@
             html += `<div class="tip-row"><span class="tip-label">💧 Dry:</span> <span class="tip-value">Needs water</span></div>`;
           }
           html += `<div class="tip-row"><span class="tip-label">XP:</span> <span class="tip-value">+${seedDef.xpPerHarvest} ✨ on harvest</span></div>`;
-          html += `<div class="tip-row"><span class="tip-label">Sell:</span> <span class="tip-value">🪙${Math.max(1, Math.floor(seedDef.sellPricePerUnit * globalThis.GAME_CONFIG.SELL_MULTIPLIER))} each</span></div>`;
+          html += `<div class="tip-row"><span class="tip-label">Sell:</span> <span class="tip-value">💰${Math.max(1, Math.floor(seedDef.sellPricePerUnit * globalThis.GAME_CONFIG.SELL_MULTIPLIER))} each</span></div>`;
 
           showTooltip(html, x, y);
         }
