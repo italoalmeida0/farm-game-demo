@@ -12,8 +12,8 @@ import { SEEDS, ANIMALS, WAREHOUSE_ITEMS, FEED_COST, TOOLS, XP_PER_LEVEL, GAME_M
 // CONFIGURATION
 // ============================================================
 
-const TRUST_PROXY = false;
-const ALLOWED_ORIGINS = ['*'];
+const TRUST_PROXY = process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1';
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : ['*'];
 const ENABLE_DEBUG = process.env.ENABLE_DEBUG === 'true' || process.env.NODE_ENV !== 'production';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -218,6 +218,13 @@ const RATE_LIMIT_MAX = 200;
 const regRateLimits = new Map();
 const REG_RATE_LIMIT_WINDOW = 10 * 60 * 1000;
 const REG_RATE_LIMIT_MAX = 3;
+
+// Anti-replay stores
+const usedTOTPCodes = new Map(); // code+secretHash -> usedAt
+const TOTP_CODE_TTL = 90_000; // 90s window
+
+const usedGoogleTokens = new Map(); // idToken -> usedAt
+const GOOGLE_TOKEN_TTL = 65 * 60 * 1000; // 65 minutes (Google tokens expire ~1h)
 
 const LOCK_TTL_MS = 10_000;
 const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -498,14 +505,26 @@ async function verifyTOTP(secret, token) {
   // Allow one step before and after current
   for (let i = -1; i <= 1; i++) {
     const expected = await hotp(secret, Math.floor((now + i * TOTP_STEP) / TOTP_STEP));
-    if (expected === token) return true;
+    if (expected === token) {
+      // AUDIT-004: Anti-replay — check if this code was already used for this secret
+      const secretHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret + expected));
+      const codeKey = bytesToHex(new Uint8Array(secretHash));
+      if (usedTOTPCodes.has(codeKey)) {
+        return false; // Code already used — replay detected
+      }
+      usedTOTPCodes.set(codeKey, Date.now());
+      return true;
+    }
   }
   return false;
 }
 
 function getClientIp(req) {
   if (TRUST_PROXY) {
-    return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    // Cloudflare headers first, then generic proxy headers
+    return req.headers.get('cf-connecting-ip')
+      || req.headers.get('true-client-ip')
+      || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       || req.headers.get('x-real-ip')
       || 'local';
   }
@@ -599,6 +618,9 @@ function corsHeaders(origin) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json',
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
   };
 }
 
@@ -610,8 +632,35 @@ function jsonResp(data, status = 200, origin) {
 // RATE LIMITING
 // ============================================================
 
-function checkRateLimit(_ip) { return true; }
-function checkRegRateLimit(_ip) { return true; }
+function checkRateLimit(ip) {
+  if (!ip || ip === 'local') return true; // Skip if IP not available
+  const now = Date.now();
+  const entry = rateLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimits.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return false;
+  }
+  return true;
+}
+
+function checkRegRateLimit(ip) {
+  if (!ip || ip === 'local') return true; // Skip if IP not available
+  const now = Date.now();
+  const entry = regRateLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    regRateLimits.set(ip, { count: 1, resetAt: now + REG_RATE_LIMIT_WINDOW });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > REG_RATE_LIMIT_MAX) {
+    return false;
+  }
+  return true;
+}
 
 // ============================================================
 // REQUEST BODY VALIDATION
@@ -885,6 +934,11 @@ async function handleRequest(req) {
           return jsonResp({ success: false, error: 'ID token required' }, 400, origin);
         }
 
+        // AUDIT-023: Anti-replay for Google ID tokens
+        if (usedGoogleTokens.has(idToken)) {
+          return jsonResp({ success: false, error: 'Token has already been used' }, 401, origin);
+        }
+
         // Verify Google ID token
         let googlePayload;
         try {
@@ -915,6 +969,9 @@ async function handleRequest(req) {
         if (bannedEmails.has(googleEmail)) {
           return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
         }
+
+        // Mark token as used after successful verification
+        usedGoogleTokens.set(idToken, Date.now());
 
         // Find account by googleId
         let account = null;
@@ -1020,7 +1077,12 @@ async function handleRequest(req) {
         }
 
         const googleId = googlePayload.sub;
-        const googleEmail = googlePayload.email || '';
+        const googleEmail = (googlePayload.email || '').toLowerCase();
+
+        // AUDIT-024-B: Check if email is globally banned
+        if (bannedEmails.has(googleEmail)) {
+          return jsonResp({ success: false, error: 'This account has been suspended' }, 403, origin);
+        }
 
         // Check if this googleId is already linked to another account
         for (const [key, acc] of accounts) {
@@ -1239,7 +1301,21 @@ async function handleRequest(req) {
         account.passwordHash = await hashPasswordPBKDF2(newPassword);
         await saveAccounts();
 
-        return jsonResp({ success: true }, 200, origin);
+        // AUDIT-003: Invalidate all other sessions for this player after password change
+        let sessionsInvalidated = 0;
+        const currentToken = req.headers.get('authorization')?.slice(7);
+        for (const [token, session] of sessions) {
+          if (session.playerId === account.playerId && token !== currentToken) {
+            sessions.delete(token);
+            sessionsInvalidated++;
+          }
+        }
+        if (sessionsInvalidated > 0) {
+          debouncedSaveSessions();
+          console.log(`[SECURITY] Invalidated ${sessionsInvalidated} session(s) for "${account.username}" after password change`);
+        }
+
+        return jsonResp({ success: true, sessionsInvalidated }, 200, origin);
       }
 
       // --- 2FA Status ---
