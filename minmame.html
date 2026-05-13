@@ -25,93 +25,26 @@
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
-      height: 100%;
-      font-family: var(--font);
       background: var(--bg);
       color: var(--text);
+      font-family: var(--font);
       font-size: 14px;
       line-height: 1.5;
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    /* Layout */
-    .app {
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .sidebar {
-      width: 260px;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
-    .sidebar-header {
-      padding: 16px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 13px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .sidebar-nav {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px 0;
-    }
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 16px;
-      cursor: pointer;
-      color: var(--text-muted);
-      font-size: 13px;
-      border-left: 2px solid transparent;
-      transition: all 0.12s;
-    }
-    .nav-item:hover {
-      background: var(--surface-hover);
-      color: var(--text);
-    }
-    .nav-item.active {
-      background: var(--bg);
-      color: var(--text);
-      border-left-color: var(--accent);
-    }
-    .nav-icon { width: 16px; text-align: center; font-size: 14px; }
-
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    .topbar {
-      height: 48px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .topbar-title {
-      font-weight: 600;
-      font-size: 14px;
-      flex: 1;
-    }
-    .topbar-actions { display: flex; gap: 8px; }
-
-    .content {
-      flex: 1;
-      overflow: auto;
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
       padding: 24px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 20px 0;
+      color: var(--text);
     }
 
     /* Inputs */
@@ -125,6 +58,7 @@
       font-family: var(--font);
       outline: none;
       transition: border-color 0.15s;
+      width: 100%;
     }
     input:focus { border-color: var(--accent); }
     input::placeholder { color: var(--text-faint); }
@@ -144,6 +78,7 @@
       cursor: pointer;
       transition: all 0.12s;
       font-family: var(--font);
+      white-space: nowrap;
     }
     .btn:hover { background: var(--surface-hover); border-color: var(--text-muted); }
     .btn-primary {
@@ -161,7 +96,7 @@
     .btn-sm { padding: 4px 10px; font-size: 12px; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Cards / Panels */
+    /* Panels */
     .panel {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -176,6 +111,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .panel-body { padding: 16px; }
 
@@ -220,15 +157,15 @@
     .badge-warning { background: rgba(210, 153, 34, 0.15); color: var(--warning); }
 
     /* Forms */
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .form-group label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
     .form-row {
       display: flex;
       gap: 12px;
       align-items: flex-end;
       flex-wrap: wrap;
-      margin-bottom: 12px;
     }
-    .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
-    .form-group label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+    .form-row .form-group { flex: 1; min-width: 180px; margin-bottom: 0; }
 
     /* Pagination */
     .pagination {
@@ -260,14 +197,13 @@
     .response-box.success { border-color: var(--success); }
 
     /* Master key section */
-    .mk-section {
-      padding: 12px 16px;
-      border-top: 1px solid var(--border);
+    .mk-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
     }
-    .mk-section input {
-      width: 100%;
-      margin-bottom: 8px;
-    }
+    .mk-row input { flex: 1; min-width: 200px; }
 
     /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -280,182 +216,152 @@
 
     /* Truncate */
     .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Tag cloud */
+    .tag-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="sidebar-header">minmame</div>
-      <nav class="sidebar-nav">
-        <div class="nav-item active" data-tab="users" onclick="showTab('users')">
-          <span class="nav-icon">👥</span> Users
-        </div>
-        <div class="nav-item" data-tab="banned" onclick="showTab('banned')">
-          <span class="nav-icon">🚫</span> Banned
-        </div>
-        <div class="nav-item" data-tab="create" onclick="showTab('create')">
-          <span class="nav-icon">➕</span> Create User
-        </div>
-        <div class="nav-item" data-tab="delete" onclick="showTab('delete')">
-          <span class="nav-icon">🗑️</span> Delete User
-        </div>
-        <div class="nav-item" data-tab="ban" onclick="showTab('ban')">
-          <span class="nav-icon">🔨</span> Ban / Unban
-        </div>
-      </nav>
-      <div class="mk-section">
-        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">Master Key</label>
-        <input type="password" id="masterKey" placeholder="••••••••">
-        <div style="display: flex; gap: 6px;">
-          <button class="btn btn-sm" onclick="saveMasterKey()" style="flex:1;">Save</button>
+  <div class="container">
+    <h1>minmame</h1>
+
+    <!-- Master Key -->
+    <div class="panel">
+      <div class="panel-header">Master Key</div>
+      <div class="panel-body">
+        <div class="mk-row">
+          <input type="password" id="masterKey" placeholder="Enter master key...">
+          <button class="btn btn-sm" onclick="saveMasterKey()">Save</button>
           <button class="btn btn-sm" onclick="toggleMkVisibility()" title="Toggle visibility">👁</button>
         </div>
       </div>
-    </aside>
+    </div>
 
-    <main class="main">
-      <header class="topbar">
-        <div class="topbar-title" id="page-title">Users</div>
-        <div class="topbar-actions" id="topbar-actions"></div>
-      </header>
-
-      <div class="content">
-        <!-- Users Tab -->
-        <div id="tab-users" class="tab-content active">
-          <div class="panel">
-            <div class="panel-header">
-              <span>User List</span>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input type="text" id="users-search" placeholder="Filter username..." style="width:180px;" oninput="filterUsers()">
-                <button class="btn btn-sm" onclick="loadUsers()">Refresh</button>
-              </div>
-            </div>
-            <div class="panel-body" style="padding:0;">
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Username</th>
-                      <th>Status</th>
-                      <th>Google</th>
-                      <th>Email</th>
-                      <th>2FA</th>
-                      <th>Level</th>
-                      <th>XP</th>
-                      <th>Warehouse</th>
-                      <th>Animals</th>
-                    </tr>
-                  </thead>
-                  <tbody id="users-tbody">
-                    <tr><td colspan="9" class="empty">Click Refresh to load users.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="pagination" id="users-pagination" style="display:none; padding: 12px 16px; border-top: 1px solid var(--border-subtle);">
-                <span class="pagination-info" id="users-pag-info"></span>
-                <button class="btn btn-sm" id="users-prev" onclick="changePage(-1)">Previous</button>
-                <button class="btn btn-sm" id="users-next" onclick="changePage(1)">Next</button>
-              </div>
-            </div>
-          </div>
-          <div id="users-response" class="response-box"></div>
-        </div>
-
-        <!-- Banned Tab -->
-        <div id="tab-banned" class="tab-content">
-          <div class="panel">
-            <div class="panel-header">
-              <span>Banned Users</span>
-              <button class="btn btn-sm" onclick="loadBanned()">Refresh</button>
-            </div>
-            <div class="panel-body">
-              <div id="banned-users-container">
-                <p class="empty">Click Refresh to load banned users.</p>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-header">
-              <span>Banned Emails</span>
-            </div>
-            <div class="panel-body">
-              <div id="banned-emails-container">
-                <p class="empty">Click Refresh to load banned emails.</p>
-              </div>
-            </div>
-          </div>
-          <div id="banned-response" class="response-box"></div>
-        </div>
-
-        <!-- Create User Tab -->
-        <div id="tab-create" class="tab-content">
-          <div class="panel" style="max-width: 480px;">
-            <div class="panel-header">Create User</div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="create-username" placeholder="e.g. farmer_john">
-              </div>
-              <div class="form-group" style="margin-top: 12px;">
-                <label>Password</label>
-                <input type="text" id="create-password" placeholder="min 6 characters">
-              </div>
-              <button class="btn btn-primary" style="margin-top: 16px;" onclick="createUser()">Create User</button>
-              <div id="create-response" class="response-box"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Delete User Tab -->
-        <div id="tab-delete" class="tab-content">
-          <div class="panel" style="max-width: 480px;">
-            <div class="panel-header">Delete User</div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="delete-username" placeholder="username to delete">
-              </div>
-              <button class="btn btn-danger" style="margin-top: 16px;" onclick="deleteUser()">Delete Permanently</button>
-              <div id="delete-response" class="response-box"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Ban/Unban Tab -->
-        <div id="tab-ban" class="tab-content">
-          <div class="panel" style="max-width: 480px;">
-            <div class="panel-header">Ban</div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label>Username (optional)</label>
-                <input type="text" id="ban-username" placeholder="username">
-              </div>
-              <div class="form-group" style="margin-top: 12px;">
-                <label>Email (optional)</label>
-                <input type="text" id="ban-email" placeholder="email">
-              </div>
-              <button class="btn btn-danger" style="margin-top: 16px;" onclick="banUser()">Ban</button>
-              <div id="ban-response" class="response-box"></div>
-            </div>
-          </div>
-          <div class="panel" style="max-width: 480px;">
-            <div class="panel-header">Unban</div>
-            <div class="panel-body">
-              <div class="form-group">
-                <label>Username (optional)</label>
-                <input type="text" id="unban-username" placeholder="username">
-              </div>
-              <div class="form-group" style="margin-top: 12px;">
-                <label>Email (optional)</label>
-                <input type="text" id="unban-email" placeholder="email">
-              </div>
-              <button class="btn btn-primary" style="margin-top: 16px;" onclick="unbanUser()">Unban</button>
-              <div id="unban-response" class="response-box"></div>
-            </div>
-          </div>
+    <!-- Users -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Users</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="users-search" placeholder="Filter username..." style="width:180px;" oninput="filterUsers()">
+          <button class="btn btn-sm" onclick="loadUsers()">Refresh</button>
         </div>
       </div>
-    </main>
+      <div class="panel-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Status</th>
+                <th>Google</th>
+                <th>Email</th>
+                <th>2FA</th>
+                <th>Level</th>
+                <th>XP</th>
+                <th>Warehouse</th>
+                <th>Animals</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="9" class="empty">Click Refresh to load users.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="users-pagination" style="display:none; padding: 12px 16px; border-top: 1px solid var(--border-subtle);">
+          <span class="pagination-info" id="users-pag-info"></span>
+          <button class="btn btn-sm" id="users-prev" onclick="changePage(-1)">Previous</button>
+          <button class="btn btn-sm" id="users-next" onclick="changePage(1)">Next</button>
+        </div>
+      </div>
+      <div id="users-response" class="response-box"></div>
+    </div>
+
+    <!-- Banned -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Banned</span>
+        <button class="btn btn-sm" onclick="loadBanned()">Refresh</button>
+      </div>
+      <div class="panel-body">
+        <div class="form-group">
+          <label>Banned Usernames</label>
+          <div id="banned-users-container"><p class="empty">Click Refresh to load.</p></div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label>Banned Emails</label>
+          <div id="banned-emails-container"><p class="empty">Click Refresh to load.</p></div>
+        </div>
+      </div>
+      <div id="banned-response" class="response-box"></div>
+    </div>
+
+    <!-- Create User -->
+    <div class="panel">
+      <div class="panel-header">Create User</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="create-username" placeholder="e.g. farmer_john">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" id="create-password" placeholder="min 6 characters">
+        </div>
+        <button class="btn btn-primary" onclick="createUser()">Create User</button>
+        <div id="create-response" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- Delete User -->
+    <div class="panel">
+      <div class="panel-header">Delete User</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="delete-username" placeholder="username to delete">
+        </div>
+        <button class="btn btn-danger" onclick="deleteUser()">Delete Permanently</button>
+        <div id="delete-response" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- Ban -->
+    <div class="panel">
+      <div class="panel-header">Ban</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username (optional)</label>
+          <input type="text" id="ban-username" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>Email (optional)</label>
+          <input type="text" id="ban-email" placeholder="email">
+        </div>
+        <button class="btn btn-danger" onclick="banUser()">Ban</button>
+        <div id="ban-response" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- Unban -->
+    <div class="panel">
+      <div class="panel-header">Unban</div>
+      <div class="panel-body" style="max-width: 480px;">
+        <div class="form-group">
+          <label>Username (optional)</label>
+          <input type="text" id="unban-username" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>Email (optional)</label>
+          <input type="text" id="unban-email" placeholder="email">
+        </div>
+        <button class="btn btn-primary" onclick="unbanUser()">Unban</button>
+        <div id="unban-response" class="response-box"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -463,7 +369,6 @@
     let masterKey = localStorage.getItem('fg_admin_masterKey') || '';
     document.getElementById('masterKey').value = masterKey;
 
-    // Pagination state
     let usersOffset = 0;
     const usersLimit = 20;
     let usersTotal = 0;
@@ -479,22 +384,6 @@
     function toggleMkVisibility() {
       const el = document.getElementById('masterKey');
       el.type = el.type === 'password' ? 'text' : 'password';
-    }
-
-    function showTab(id) {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      document.querySelector(`.nav-item[data-tab="${id}"]`).classList.add('active');
-      document.getElementById('tab-' + id).classList.add('active');
-
-      const titles = {
-        users: 'Users',
-        banned: 'Banned',
-        create: 'Create User',
-        delete: 'Delete User',
-        ban: 'Ban / Unban',
-      };
-      document.getElementById('page-title').textContent = titles[id] || id;
     }
 
     function showResponse(id, text, type) {
@@ -613,10 +502,10 @@
         const users = data.bannedUsernames || [];
         const emails = data.bannedEmails || [];
         uContainer.innerHTML = users.length
-          ? '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + users.map(u => `<span class="badge badge-danger">${esc(u)}</span>`).join('') + '</div>'
+          ? '<div class="tag-cloud">' + users.map(u => `<span class="badge badge-danger">${esc(u)}</span>`).join('') + '</div>'
           : '<p class="empty">No banned users.</p>';
         eContainer.innerHTML = emails.length
-          ? '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + emails.map(e => `<span class="badge badge-danger">${esc(e)}</span>`).join('') + '</div>'
+          ? '<div class="tag-cloud">' + emails.map(e => `<span class="badge badge-danger">${esc(e)}</span>`).join('') + '</div>'
           : '<p class="empty">No banned emails.</p>';
         showResponse('banned', `Banned: ${users.length} users, ${emails.length} emails`, 'success');
       } catch (err) {
@@ -676,7 +565,10 @@
     }
     function trunc(str, n) { return str.length > n ? str.slice(0, n) + '…' : str; }
 
-    if (masterKey) loadUsers();
+    if (masterKey) {
+      loadUsers();
+      loadBanned();
+    }
   </script>
 </body>
 </html>
