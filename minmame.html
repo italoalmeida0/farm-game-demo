@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farm Game Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.5;
+    }
+    h1 { color: #4ecca3; margin-top: 0; }
+    h2 { color: #7fdbca; border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 30px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #0f3460;
+    }
+    label { display: block; margin-bottom: 6px; font-weight: 500; color: #a0c4ff; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      background: #0f1b30;
+      color: #eee;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    input:focus { outline: none; border-color: #4ecca3; }
+    button {
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { background: #3db892; }
+    button.secondary {
+      background: #0f3460;
+      color: #eee;
+    }
+    button.secondary:hover { background: #1a4a7a; }
+    button.danger {
+      background: #e74c3c;
+      color: #fff;
+    }
+    button.danger:hover { background: #c0392b; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 200px; }
+    .master-key-section {
+      background: #0f3460;
+      border: 1px solid #4ecca3;
+    }
+    .response {
+      background: #0f1b30;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 12px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+    .response.visible { display: block; }
+    .response.error { border-color: #e74c3c; }
+    .response.success { border-color: #4ecca3; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #0f3460;
+    }
+    th { color: #7fdbca; font-weight: 600; }
+    tr:hover { background: #0f1b30; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-yes { background: #4ecca3; color: #1a1a2e; }
+    .badge-no { background: #444; color: #aaa; }
+    .loading { opacity: 0.6; pointer-events: none; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 16px;
+      background: #0f1b30;
+      border: 1px solid #0f3460;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .tab.active {
+      background: #16213e;
+      color: #4ecca3;
+      border-bottom-color: #16213e;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛠️ Farm Game Admin Panel</h1>
+
+    <div class="card master-key-section">
+      <label for="masterKey">Master Key</label>
+      <div class="row">
+        <input type="password" id="masterKey" placeholder="Enter master key..." style="flex: 3;">
+        <button onclick="saveMasterKey()">Save</button>
+        <button class="secondary" onclick="toggleMasterKeyVisibility()">👁️ Show</button>
+      </div>
+      <small style="color: #888;">The master key is required for all admin operations.</small>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('users')">👥 Users</div>
+      <div class="tab" onclick="showTab('create')">➕ Create User</div>
+      <div class="tab" onclick="showTab('delete')">🗑️ Delete User</div>
+      <div class="tab" onclick="showTab('ban')">🔨 Ban / Unban</div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-content active">
+      <div class="card">
+        <div class="row" style="align-items: center;">
+          <h2 style="margin: 0; border: none; flex: 1;">User List</h2>
+          <button onclick="loadUsers()">🔄 Refresh</button>
+        </div>
+        <div id="users-table-container" style="margin-top: 12px;">
+          <p style="color: #888;">Click Refresh to load users.</p>
+        </div>
+        <div id="users-response" class="response"></div>
+      </div>
+    </div>
+
+    <!-- Create User Tab -->
+    <div id="tab-create" class="tab-content">
+      <div class="card">
+        <h2>Create User</h2>
+        <label for="create-username">Username</label>
+        <input type="text" id="create-username" placeholder="username">
+        <label for="create-password">Password</label>
+        <input type="text" id="create-password" placeholder="password">
+        <button onclick="createUser()">Create User</button>
+        <div id="create-response" class="response"></div>
+      </div>
+    </div>
+
+    <!-- Delete User Tab -->
+    <div id="tab-delete" class="tab-content">
+      <div class="card">
+        <h2>Delete User</h2>
+        <label for="delete-username">Username</label>
+        <input type="text" id="delete-username" placeholder="username">
+        <button class="danger" onclick="deleteUser()">Delete User</button>
+        <div id="delete-response" class="response"></div>
+      </div>
+    </div>
+
+    <!-- Ban/Unban Tab -->
+    <div id="tab-ban" class="tab-content">
+      <div class="card">
+        <h2>Ban User</h2>
+        <label for="ban-username">Username (optional)</label>
+        <input type="text" id="ban-username" placeholder="username">
+        <label for="ban-email">Email (optional)</label>
+        <input type="text" id="ban-email" placeholder="email">
+        <button class="danger" onclick="banUser()">Ban</button>
+        <div id="ban-response" class="response"></div>
+      </div>
+
+      <div class="card">
+        <h2>Unban User</h2>
+        <label for="unban-username">Username (optional)</label>
+        <input type="text" id="unban-username" placeholder="username">
+        <label for="unban-email">Email (optional)</label>
+        <input type="text" id="unban-email" placeholder="email">
+        <button onclick="unbanUser()">Unban</button>
+        <div id="unban-response" class="response"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let masterKey = localStorage.getItem('fg_admin_masterKey') || '';
+    document.getElementById('masterKey').value = masterKey;
+
+    function saveMasterKey() {
+      masterKey = document.getElementById('masterKey').value.trim();
+      localStorage.setItem('fg_admin_masterKey', masterKey);
+      showResponse('masterKey', 'Master key saved to localStorage.', 'success');
+    }
+
+    function toggleMasterKeyVisibility() {
+      const el = document.getElementById('masterKey');
+      el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    function showTab(id) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.tab[onclick="showTab('${id}')"]`).classList.add('active');
+      document.getElementById('tab-' + id).classList.add('active');
+    }
+
+    function showResponse(id, text, type) {
+      const el = document.getElementById(id + '-response');
+      el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+      el.className = 'response visible ' + (type || '');
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(API_BASE + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, masterKey }),
+      });
+      return res.json();
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(API_BASE + path + '?masterKey=' + encodeURIComponent(masterKey));
+      return res.json();
+    }
+
+    async function loadUsers() {
+      const container = document.getElementById('users-table-container');
+      container.innerHTML = '<p style="color: #888;">Loading...</p>';
+      try {
+        const data = await apiGet('/api/admin/users');
+        if (!data.success) {
+          showResponse('users', data.error || 'Failed to load users', 'error');
+          container.innerHTML = '';
+          return;
+        }
+        showResponse('users', `Loaded ${data.users.length} users`, 'success');
+        renderUsersTable(data.users);
+      } catch (err) {
+        showResponse('users', 'Error: ' + err.message, 'error');
+        container.innerHTML = '';
+      }
+    }
+
+    function renderUsersTable(users) {
+      if (!users.length) {
+        document.getElementById('users-table-container').innerHTML = '<p style="color: #888;">No users found.</p>';
+        return;
+      }
+      let html = '<table><thead><tr>' +
+        '<th>Username</th>' +
+        '<th>Google</th>' +
+        '<th>Email</th>' +
+        '<th>2FA</th>' +
+        '<th>Level</th>' +
+        '<th>XP</th>' +
+        '<th>Warehouse</th>' +
+        '<th>Animals</th>' +
+        '</tr></thead><tbody>';
+      for (const u of users) {
+        const wh = u.warehouse.map(w => `${w.itemId}×${w.quantity}`).join(', ') || '-';
+        const an = u.animals.map(a => a.type).join(', ') || '-';
+        html += `<tr>` +
+          `<td>${escapeHtml(u.username)}</td>` +
+          `<td>${u.googleLinked ? '<span class="badge badge-yes">Yes</span>' : '<span class="badge badge-no">No</span>'}</td>` +
+          `<td>${u.email ? escapeHtml(u.email) : '-'}</td>` +
+          `<td>${u.has2FA ? '<span class="badge badge-yes">On</span>' : '<span class="badge badge-no">Off</span>'}</td>` +
+          `<td>${u.level}</td>` +
+          `<td>${u.xp}</td>` +
+          `<td title="${escapeHtml(wh)}">${escapeHtml(truncate(wh, 30))}</td>` +
+          `<td>${escapeHtml(an)}</td>` +
+          `</tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('users-table-container').innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function truncate(str, n) {
+      return str.length > n ? str.slice(0, n) + '…' : str;
+    }
+
+    async function createUser() {
+      const username = document.getElementById('create-username').value.trim();
+      const password = document.getElementById('create-password').value;
+      if (!username || !password) {
+        showResponse('create', 'Username and password required', 'error');
+        return;
+      }
+      try {
+        const data = await apiPost('/api/admin/create-user', { username, password });
+        showResponse('create', data, data.success ? 'success' : 'error');
+        if (data.success) {
+          document.getElementById('create-username').value = '';
+          document.getElementById('create-password').value = '';
+        }
+      } catch (err) {
+        showResponse('create', 'Error: ' + err.message, 'error');
+      }
+    }
+
+    async function deleteUser() {
+      const username = document.getElementById('delete-username').value.trim();
+      if (!username) {
+        showResponse('delete', 'Username required', 'error');
+        return;
+      }
+      if (!confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`)) return;
+      try {
+        const data = await apiPost('/api/admin/delete-user', { username });
+        showResponse('delete', data, data.success ? 'success' : 'error');
+        if (data.success) document.getElementById('delete-username').value = '';
+      } catch (err) {
+        showResponse('delete', 'Error: ' + err.message, 'error');
+      }
+    }
+
+    async function banUser() {
+      const username = document.getElementById('ban-username').value.trim() || undefined;
+      const email = document.getElementById('ban-email').value.trim() || undefined;
+      if (!username && !email) {
+        showResponse('ban', 'Username or email required', 'error');
+        return;
+      }
+      try {
+        const data = await apiPost('/api/admin/ban-user', { username, email });
+        showResponse('ban', data, data.success ? 'success' : 'error');
+        if (data.success) {
+          document.getElementById('ban-username').value = '';
+          document.getElementById('ban-email').value = '';
+        }
+      } catch (err) {
+        showResponse('ban', 'Error: ' + err.message, 'error');
+      }
+    }
+
+    async function unbanUser() {
+      const username = document.getElementById('unban-username').value.trim() || undefined;
+      const email = document.getElementById('unban-email').value.trim() || undefined;
+      if (!username && !email) {
+        showResponse('unban', 'Username or email required', 'error');
+        return;
+      }
+      try {
+        const data = await apiPost('/api/admin/unban-user', { username, email });
+        showResponse('unban', data, data.success ? 'success' : 'error');
+        if (data.success) {
+          document.getElementById('unban-username').value = '';
+          document.getElementById('unban-email').value = '';
+        }
+      } catch (err) {
+        showResponse('unban', 'Error: ' + err.message, 'error');
+      }
+    }
+
+    // Load users on first visit if master key is saved
+    if (masterKey) loadUsers();
+  </script>
+</body>
+</html>

@@ -1723,6 +1723,13 @@ async function handleRequest(req) {
       return new Response(file, { headers: { 'Content-Type': 'text/html' } });
     }
 
+    if (path === '/minmame' || path === '/minmame.html') {
+      const file = Bun.file('./minmame.html');
+      if (await file.exists()) {
+        return new Response(file, { headers: { 'Content-Type': 'text/html' } });
+      }
+    }
+
     // Public pages
     if (path === '/privacy-policy' || path === '/privacy-policy.html') {
       const file = Bun.file('./privacy-policy.html');
