@@ -338,6 +338,28 @@
         font-weight: bold;
       }
 
+      .fullscreen-btn {
+        display: none;
+        padding: 4px 8px;
+        background: var(--btn);
+        color: var(--text);
+        border: 2px solid var(--panel-border);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .fullscreen-btn:hover {
+        background: var(--btn-hover);
+      }
+      @media (hover: none) and (pointer: coarse) {
+        .fullscreen-btn {
+          display: inline-block;
+        }
+      }
+
       /* Main area: farm + barn side by side */
       .main-area {
         flex: 1;
@@ -1552,6 +1574,54 @@
         background: var(--btn-hover);
       }
 
+      /* --- Rotate Device Overlay --- */
+      .rotate-overlay {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        z-index: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        animation: tooltipFadeIn 0.3s ease;
+      }
+      .rotate-overlay.hidden {
+        display: none;
+      }
+      .rotate-overlay .rotate-icon {
+        font-size: 80px;
+        animation: rotatePhone 1.5s ease-in-out infinite;
+      }
+      @keyframes rotatePhone {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+      }
+      .rotate-overlay .rotate-title {
+        font-size: 22px;
+        font-weight: bold;
+        color: var(--gold);
+      }
+      .rotate-overlay .rotate-msg {
+        font-size: 15px;
+        color: var(--text-dark);
+        text-align: center;
+        max-width: 300px;
+        padding: 0 20px;
+      }
+      /* Only show rotate overlay on mobile/touch devices in portrait */
+      @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+        .rotate-overlay:not(.hidden) {
+          display: flex;
+        }
+      }
+      @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+        .rotate-overlay {
+          display: none !important;
+        }
+      }
+
       /* --- Update Banner --- */
       .update-banner {
         position: fixed;
@@ -1695,7 +1765,7 @@
               id="google-config-error"
               style="margin-top: 8px; display: none"
             >
-              Google Sign-In is not configured on this server.
+              Google Sign-In is not configured on this server. try reloading the application.
             </div>
           </div>
           <div
@@ -1777,6 +1847,14 @@
             "
             >⚡ DEV MODE</span
           >
+          <button
+            type="button"
+            class="fullscreen-btn"
+            id="fullscreen-btn"
+            title="Enter Fullscreen"
+          >
+            ⛶
+          </button>
           <div class="player-badge">
             <span>🧑‍🌾</span>
             <span class="name" id="player-name-display">Farmer</span>
@@ -2172,6 +2250,15 @@
       >
         🔄 Try Now
       </button>
+    </div>
+
+    <!-- Rotate Device Overlay -->
+    <div class="rotate-overlay hidden" id="rotate-overlay">
+      <div class="rotate-icon">📱</div>
+      <div class="rotate-title">Rotate Your Device</div>
+      <div class="rotate-msg">
+        Please turn your phone sideways to play the game in landscape mode.
+      </div>
     </div>
 
     <!-- Info Tooltip (dynamic, positioned by JS) -->
@@ -3286,7 +3373,29 @@
         } catch (e) {
           /* ignore */
         }
+
+        // Show rotate overlay if mobile in portrait
+        checkOrientation();
       }
+
+      // ============================================================
+      // ORIENTATION CHECK (mobile portrait warning)
+      // ============================================================
+      function checkOrientation() {
+        const overlay = document.getElementById("rotate-overlay");
+        const gameScreen = document.getElementById("game-screen");
+        if (!overlay || !gameScreen) return;
+        const isMobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const isLoggedIn = gameScreen.classList.contains("active");
+        if (isMobile && isPortrait && isLoggedIn) {
+          overlay.classList.remove("hidden");
+        } else {
+          overlay.classList.add("hidden");
+        }
+      }
+      window.addEventListener("resize", checkOrientation);
+      window.addEventListener("orientationchange", checkOrientation);
 
       // ============================================================
       // FARM GRID
@@ -3821,6 +3930,24 @@
           if (!clickedInsidePanel && !clickedBtn) {
             panel.classList.remove("open");
           }
+        }
+      });
+
+      // Attach fullscreen handler directly to avoid inline onclick reference error
+      const fullscreenBtn = document.getElementById("fullscreen-btn");
+      if (fullscreenBtn) {
+        fullscreenBtn.addEventListener("click", () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+        });
+      }
+      document.addEventListener("fullscreenchange", () => {
+        const btn = document.getElementById("fullscreen-btn");
+        if (btn) {
+          btn.title = document.fullscreenElement ? "Exit Fullscreen" : "Enter Fullscreen";
         }
       });
 
